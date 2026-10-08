@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spotify 授权回调</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Microsoft YaHei";margin:0;padding:24px;background:#0b0d10;color:#e7e9ee}
+    .card{background:#151a20;border:1px solid #2a313b;border-radius:10px;padding:16px;margin-bottom:16px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    input,button{padding:10px 14px;border-radius:8px;border:1px solid #2a313b;background:#1f2630;color:#e7e9ee}
+    button:hover{background:#26303a}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Spotify 授权完成</h1>
+    <p id="status">正在解析令牌...</p>
+    <div>
+      <label for="token" class="mono">Bearer 令牌</label>
+      <input id="token" class="mono" style="width:100%" readonly />
+    </div>
+    <div style="margin-top:8px">
+      <button id="btnCopy">复制令牌</button>
+      <button id="btnClose">关闭此窗口</button>
+    </div>
+    <div class="mono" id="err" style="color:#f87171;margin-top:10px"></div>
+  </div>
+
+  <script>
+    (function(){
+      const els = {
+        status: document.getElementById('status'),
+        token: document.getElementById('token'),
+        btnCopy: document.getElementById('btnCopy'),
+        btnClose: document.getElementById('btnClose'),
+        err: document.getElementById('err'),
+      };
+
+      function copy(text){
+        try{ if(navigator.clipboard && navigator.clipboard.writeText){ return navigator.clipboard.writeText(text); } }catch{}
+        return new Promise((resolve)=>{
+          const ta = document.createElement('textarea'); ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+          document.body.appendChild(ta); ta.focus(); ta.select(); try{ document.execCommand('copy'); }catch{}
+          ta.remove(); resolve();
+        });
+      }
+
+      function parseHash(){
+        const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+        const params = new URLSearchParams(hash);
+        const token = params.get('access_token');
+        const type = params.get('token_type') || 'Bearer';
+        if(!token){ throw new Error('回调中未找到 access_token。请确认授权同意。'); }
+        return `${type} ${token}`;
+      }
+
+      try{
+        const bearer = parseHash();
+        els.token.value = bearer;
+        els.status.textContent = '令牌已获取并显示在上方。';
+        // 回传到打开方
+        try{ window.opener && window.opener.postMessage({ type: 'spotify_token', token: bearer }, '*'); }catch{}
+      }catch(e){
+        els.err.textContent = String(e.message||e);
+        els.status.textContent = '解析失败。';
+      }
+
+      els.btnCopy.addEventListener('click', function(){ copy(els.token.value||'').then(()=>{ els.status.textContent='已复制令牌到剪贴板'; }); });
+      els.btnClose.addEventListener('click', function(){ window.close(); });
+    })();
+  </script>
+</body>
+</html>

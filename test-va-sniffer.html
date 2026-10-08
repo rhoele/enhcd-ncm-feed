@@ -1,0 +1,1904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>网易云合辑嗅探器测试页</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: rgba(20, 25, 40, 0.82);
+      --panel-strong: rgba(28, 34, 54, 0.94);
+      --line: rgba(132, 146, 196, 0.18);
+      --line-strong: rgba(129, 140, 248, 0.32);
+      --text: #eef2ff;
+      --muted: #9aa4c7;
+      --accent: #7c8cff;
+      --accent-2: #57d3ff;
+      --ok: #7ee7a8;
+      --warn: #ffd479;
+      --err: #ff8e8e;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(87, 211, 255, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(124, 140, 255, 0.18), transparent 32%),
+        linear-gradient(180deg, #080c18 0%, #0b1020 100%);
+      min-height: 100vh;
+    }
+    a { color: inherit; }
+    .page {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 22px;
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.2;
+    }
+    .hero p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 880px;
+      line-height: 1.65;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 420px minmax(0, 1fr);
+      gap: 22px;
+    }
+    .panel-body {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .section-title {
+      margin: 0 0 16px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .field {
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid rgba(140, 155, 206, 0.2);
+      background: rgba(7, 10, 20, 0.78);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      outline: none;
+      transition: 0.2s ease;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--line-strong);
+      box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.12);
+    }
+    textarea {
+      min-height: 106px;
+      resize: vertical;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    button {
+      border: 1px solid rgba(140, 155, 206, 0.2);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 11px 18px;
+      font: inherit;
+      cursor: pointer;
+      transition: 0.2s ease;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: rgba(129, 140, 248, 0.5);
+      background: rgba(255, 255, 255, 0.1);
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .primary {
+      background: linear-gradient(135deg, rgba(124, 140, 255, 0.92), rgba(87, 211, 255, 0.92));
+      color: #06111f;
+      border-color: transparent;
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(87, 211, 255, 0.2);
+    }
+    .danger {
+      color: #ffd6d6;
+      border-color: rgba(255, 142, 142, 0.22);
+      background: rgba(255, 142, 142, 0.09);
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .stat {
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    }
+    .stat .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .stat .value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .progress-wrap {
+      margin: 16px 0 12px;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      box-shadow: 0 0 24px rgba(87, 211, 255, 0.35);
+      transition: width 0.2s ease;
+    }
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+      min-height: 20px;
+    }
+    .results-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .feed {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .card {
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025));
+      box-shadow: 0 14px 36px rgba(0,0,0,0.22);
+      display: grid;
+      gap: 10px;
+    }
+    .card .cover {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+    }
+    .card .cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .card h3 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.4;
+    }
+    .card .title {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.4;
+      color: var(--text);
+      min-height: 44px;
+    }
+    .card .artist {
+      color: #c9d2ff;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .card .meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .card .badge {
+      display: inline-flex;
+      width: fit-content;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: rgba(126, 231, 168, 0.12);
+      color: var(--ok);
+      border: 1px solid rgba(126, 231, 168, 0.18);
+    }
+    .card .links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: auto;
+    }
+    .card .links a {
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.07);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .card details {
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.03);
+      padding: 10px 12px;
+    }
+    .card summary {
+      cursor: pointer;
+      color: #dbe4ff;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .track-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .track-list a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .empty {
+      border: 1px dashed rgba(140, 155, 206, 0.25);
+      border-radius: 18px;
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+    }
+    .log {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(6, 10, 18, 0.7);
+      font: 12px/1.6 Consolas, Monaco, monospace;
+      white-space: pre-wrap;
+      min-height: 260px;
+      flex: 1 1 auto;
+      overflow: auto;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .err { color: var(--err); }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .feed { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .feed { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      .page { padding: 18px; }
+      .hero { flex-direction: column; }
+      .stats, .row { grid-template-columns: 1fr; }
+      .feed { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div>
+        <h1>网易云合辑嗅探器测试页</h1>
+        <p>用于验证“关注艺人的合辑单曲扫描”是否适合后续并入增强页。当前页独立运行，不改动主增强页布局；优先复用现有 `apiBase`、Cookie 和本地 API。</p>
+      </div>
+      <div class="hero-actions">
+        <a href="index-enhanced.html"><button type="button">返回增强页</button></a>
+        <button id="fillFromSettings" type="button">读取当前设置</button>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="panel-body">
+          <h2 class="section-title">扫描配置</h2>
+          <div class="field">
+            <label for="scanBackendBase">后端扫描与缓存接口 (start-static.js)</label>
+            <input id="scanBackendBase" placeholder="本地部署：http://127.0.0.1:8001；Pages 必填" />
+            <small class="hint">合辑扫描 start/status/stop 接口，以及持久化缓存读取保存都走这个地址。</small>
+          </div>
+          <div class="field">
+            <label for="apiBase">网易云 API 基地址</label>
+            <input id="apiBase" placeholder="例如：http://127.0.0.1:3000（CORS 代理对接 ncm-api-lite）" />
+          </div>
+          <div class="field">
+            <label for="cookie">网易云 Cookie</label>
+            <textarea id="cookie" placeholder="默认会尝试读取增强页已保存的 Cookie；如为空则走浏览器凭据。"></textarea>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="startDate">起始日期</label>
+              <input id="startDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="endDate">结束日期</label>
+              <input id="endDate" type="date" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="concurrency">并发数</label>
+              <input id="concurrency" type="number" min="1" max="12" value="4" />
+            </div>
+            <div class="field">
+              <label for="songsLimit">每位艺人扫描单曲数</label>
+              <input id="songsLimit" type="number" min="10" max="100" value="30" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="manualArtists">手动艺人 ID 列表（可选）</label>
+            <textarea id="manualArtists" placeholder="留空则扫描关注艺人；也可填 12345,67890 做局部验证。"></textarea>
+          </div>
+          <div class="actions">
+            <button id="startBtn" class="primary" type="button">开始扫描</button>
+            <button id="stopBtn" class="danger" type="button" disabled>停止</button>
+            <button id="exportBtn" type="button" disabled>导出 CSV</button>
+          </div>
+          <div class="log" id="log">等待开始扫描…</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-body">
+          <div class="stats">
+            <div class="stat">
+              <div class="label">扫描艺人数</div>
+              <div class="value" id="statArtists">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">命中合辑单曲</div>
+              <div class="value" id="statHits">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">扫描结果专辑数</div>
+              <div class="value" id="statResultAlbums">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">已检查专辑日期</div>
+              <div class="value" id="statAlbums">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">耗时</div>
+              <div class="value" id="statElapsed">00:00</div>
+            </div>
+          </div>
+
+          <div class="results-toolbar">
+            <div class="chips">
+              <div class="chip" id="rangeChip">日期范围：未设置</div>
+              <div class="chip" id="modeChip">模式：关注艺人扫描</div>
+            </div>
+            <div class="hint" id="summaryHint">结果会按发行日期倒序展示。</div>
+          </div>
+
+          <div class="progress-wrap">
+            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+          </div>
+          <div id="status" class="status">尚未开始。</div>
+
+          <div id="results" class="feed">
+            <div class="empty">点击左侧“开始扫描”以验证合辑嗅探能力。</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="seed-settings.js"></script>
+  <script>
+    // ===== Seed 默认值注入（同 index-enhanced 机制） =====
+    try {
+      (function __applySeed() {
+        if (!window.NAF_SEED_SETTINGS || typeof window.NAF_SEED_SETTINGS !== 'object') return;
+        const seed = window.NAF_SEED_SETTINGS;
+        const LS_KEY_FORCE = seed.__lsKey || 'netease-feed-settings-v1';
+        const currentRaw = localStorage.getItem(LS_KEY_FORCE);
+        let shouldApply = !currentRaw;
+        if (typeof seed.__seedVersion === 'number') {
+          try {
+            const curObj = currentRaw ? JSON.parse(currentRaw) : {};
+            if (seed.__seedVersion > (Number(curObj.__seedVersion) || 0)) shouldApply = true;
+          } catch {}
+        }
+        if (seed.__force === true) shouldApply = true;
+        if (!shouldApply) return;
+        const merged = Object.assign({}, seed);
+        delete merged.__lsKey; delete merged.__force;
+        const text = JSON.stringify(merged);
+        try { localStorage.setItem(LS_KEY_FORCE, text); } catch {}
+        try {
+          const encoded = encodeURIComponent(text).replace(/'/, "%27").replace(/\(/g, "%28").replace(/\)/g, "%29");
+          document.cookie = 'naf_settings_backup=' + encoded + '; path=/; max-age=15552000; samesite=lax';
+        } catch {}
+        if (seed.__followCache && typeof seed.__followCache === 'object') {
+          try { localStorage.setItem('netease-follow-cache-v1', JSON.stringify(seed.__followCache)); } catch {}
+        }
+        if (seed.__artistCheckCache && typeof seed.__artistCheckCache === 'object') {
+          try { localStorage.setItem('netease-artist-check-cache-v2', JSON.stringify(seed.__artistCheckCache)); } catch {}
+        }
+      })();
+    } catch {}
+
+    const LS_KEY = 'netease-feed-settings-v1';
+    const FOLLOW_CACHE_KEY = 'netease-follow-cache-v1';
+    const PLAYLIST_CACHE_KEY = 'netease-playlist-cache-v1';
+    const OWNED_ALBUM_CACHE_KEY = 'netease-va-owned-album-cache-v1';
+    const VA_ALBUM_CACHE_ENDPOINT = '/api/va-album-cache';
+    const VA_OWNED_ARTIST_CACHE_ENDPOINT = '/api/va-owned-artist-cache';
+    const VA_SCAN_START_ENDPOINT = '/api/va-scan/start';
+    const VA_SCAN_STATUS_ENDPOINT = '/api/va-scan/status';
+    const VA_SCAN_STOP_ENDPOINT = '/api/va-scan/stop';
+
+    // ===== GitHub Pages 配置化：相对 /api/* -> 绝对 URL =====
+    function __trimBase(s) { const v = String(s || '').trim().replace(/\/+$/, ''); return v || ''; }
+    function __isLocalSameOrigin(portPattern) {
+      try {
+        const host = window.location.hostname || '';
+        if (!['127.0.0.1', 'localhost', ''].includes(host)) return false;
+        if (!portPattern) return true;
+        const p = window.location.port;
+        return !p || String(portPattern).split(',').includes(String(p));
+      } catch { return false; }
+    }
+    function getScanBackendBase() {
+      const saved = loadSettings();
+      const v = __trimBase(saved.scanBackendBase);
+      if (v) return v;
+      const inputEl = document.getElementById('scanBackendBase');
+      const vv = __trimBase(inputEl ? inputEl.value : '');
+      if (vv) return vv;
+      if (__isLocalSameOrigin('8001,8000,8002,8080')) return __trimBase(window.location.origin);
+      return '';
+    }
+    function resolveScanApi(rel) {
+      if (/^https?:/i.test(rel)) return rel;
+      const base = getScanBackendBase();
+      if (!base) return rel;
+      return base + (rel.startsWith('/') ? rel : '/' + rel);
+    }
+
+    const els = {
+      scanBackendBase: document.getElementById('scanBackendBase'),
+      apiBase: document.getElementById('apiBase'),
+      cookie: document.getElementById('cookie'),
+      startDate: document.getElementById('startDate'),
+      endDate: document.getElementById('endDate'),
+      concurrency: document.getElementById('concurrency'),
+      songsLimit: document.getElementById('songsLimit'),
+      manualArtists: document.getElementById('manualArtists'),
+      fillFromSettings: document.getElementById('fillFromSettings'),
+      startBtn: document.getElementById('startBtn'),
+      stopBtn: document.getElementById('stopBtn'),
+      exportBtn: document.getElementById('exportBtn'),
+      status: document.getElementById('status'),
+      log: document.getElementById('log'),
+      progressFill: document.getElementById('progressFill'),
+      results: document.getElementById('results'),
+      statArtists: document.getElementById('statArtists'),
+      statHits: document.getElementById('statHits'),
+      statResultAlbums: document.getElementById('statResultAlbums'),
+      statAlbums: document.getElementById('statAlbums'),
+      statElapsed: document.getElementById('statElapsed'),
+      rangeChip: document.getElementById('rangeChip'),
+      modeChip: document.getElementById('modeChip'),
+      summaryHint: document.getElementById('summaryHint')
+    };
+
+    let stopRequested = false;
+    let currentResults = [];
+    let albumDateCache = new Map();
+    let albumDateInflight = new Map();
+    let scanStartedAt = 0;
+    let elapsedTimer = null;
+    let logEntries = [];
+    let logFlushTimer = null;
+    let uiFlushTimer = null;
+    let latestDone = 0;
+    let latestTotal = 0;
+    let latestHits = 0;
+    let latestAlbumCount = 0;
+    let latestStatusText = '尚未开始。';
+    let latestRenderItems = [];
+    let openAlbumCards = new Set();
+    let pendingAlbumCachePersist = {};
+    let albumCachePersistTimer = null;
+    let albumCachePersistPromise = null;
+    let albumCacheHitCount = 0;
+    let albumCacheMissCount = 0;
+    let backendTaskId = '';
+    const MAX_LOG_LINES = 180;
+    const LOG_FLUSH_MS = 180;
+    const UI_FLUSH_MS = 160;
+    const ALBUM_CACHE_FLUSH_MS = 1200;
+    const ALBUM_CACHE_FLUSH_SIZE = 80;
+
+    function flushLog() {
+      logFlushTimer = null;
+      els.log.innerHTML = logEntries.join('\n');
+    }
+
+    function log(message, kind) {
+      const time = new Date().toLocaleTimeString();
+      const cls = kind ? ` ${kind}` : '';
+      logEntries.unshift(`<span class="${cls}">[${time}] ${escapeHtml(message)}</span>`);
+      if (logEntries.length > MAX_LOG_LINES) {
+        logEntries.length = MAX_LOG_LINES;
+      }
+      if (!logFlushTimer) {
+        logFlushTimer = setTimeout(flushLog, LOG_FLUSH_MS);
+      }
+    }
+
+    function flushUi() {
+      uiFlushTimer = null;
+      els.statArtists.textContent = String(latestDone);
+      els.statHits.textContent = String(latestHits);
+      els.statAlbums.textContent = String(latestAlbumCount);
+      updateProgress(latestDone, latestTotal, latestStatusText);
+      renderResults(latestRenderItems);
+    }
+
+    function scheduleUiFlush(patch = {}) {
+      if (patch.done !== undefined) latestDone = patch.done;
+      if (patch.total !== undefined) latestTotal = patch.total;
+      if (patch.hits !== undefined) latestHits = patch.hits;
+      if (patch.albumCount !== undefined) latestAlbumCount = patch.albumCount;
+      if (patch.statusText !== undefined) latestStatusText = patch.statusText;
+      if (patch.renderItems !== undefined) latestRenderItems = patch.renderItems;
+      if (!uiFlushTimer) {
+        uiFlushTimer = setTimeout(flushUi, UI_FLUSH_MS);
+      }
+    }
+
+    function flushUiNow() {
+      if (uiFlushTimer) {
+        clearTimeout(uiFlushTimer);
+      }
+      flushUi();
+    }
+
+    function setLogEntriesFromBackend(logs) {
+      logEntries = (Array.isArray(logs) ? logs : []).map(item => {
+        const cls = item?.kind ? ` ${String(item.kind)}` : '';
+        return `<span class="${cls}">[${escapeHtml(item?.time || '--:--:--')}] ${escapeHtml(item?.message || '')}</span>`;
+      });
+      if (!logEntries.length) {
+        logEntries = ['<span>[系统] 等待后端扫描状态…</span>'];
+      }
+      flushLog();
+    }
+
+    function applyBackendSnapshot(snapshot) {
+      if (!snapshot || Number(snapshot.code || 200) !== 200) return;
+      backendTaskId = String(snapshot.id || '');
+      currentResults = Array.isArray(snapshot.results) ? snapshot.results : [];
+      setLogEntriesFromBackend(snapshot.logs);
+      scheduleUiFlush({
+        done: Number(snapshot.done || 0),
+        total: Number(snapshot.total || 0),
+        hits: Number(snapshot.hits || 0),
+        albumCount: Number(snapshot.albumCacheSize || 0),
+        statusText: String(snapshot.statusText || '扫描中...'),
+        renderItems: currentResults
+      });
+      els.summaryHint.textContent = String(snapshot.summaryHint || '结果会按发行日期倒序展示。');
+      els.statElapsed.textContent = formatElapsed(Number(snapshot.elapsedMs || 0));
+    }
+
+    async function fetchBackendStatus() {
+      const res = await fetch(resolveScanApi(VA_SCAN_STATUS_ENDPOINT), {
+        method: 'GET',
+        credentials: 'include'
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(errorToMessage(body?.message || body) || `HTTP ${res.status}`);
+      }
+      return body;
+    }
+
+    async function stopBackendScan() {
+      const res = await fetch(resolveScanApi(VA_SCAN_STOP_ENDPOINT), {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || (body.code && Number(body.code) !== 200)) {
+        throw new Error(errorToMessage(body?.message || body) || `HTTP ${res.status}`);
+      }
+      return body;
+    }
+
+    async function ensureBackendTaskIdle() {
+      const snapshot = await fetchBackendStatus().catch(() => ({ code: 404 }));
+      if (Number(snapshot?.code || 404) !== 200 || !snapshot?.running) {
+        return;
+      }
+      log('检测到残留后端扫描任务，先自动停止后再启动新任务...', 'warn');
+      await stopBackendScan();
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        await sleep(500);
+        const next = await fetchBackendStatus().catch(() => ({ code: 404 }));
+        if (Number(next?.code || 404) !== 200 || !next?.running) {
+          return;
+        }
+      }
+      throw new Error('旧的后端扫描任务仍未停止，请稍后再试。');
+    }
+
+    async function startBackendScan(payload) {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const res = await fetch(resolveScanApi(VA_SCAN_START_ENDPOINT), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const body = await res.json().catch(() => ({}));
+        if (res.ok && Number(body?.code || 200) === 200) {
+          if (body.task) {
+            applyBackendSnapshot(body.task);
+          }
+          return body.task;
+        }
+        const msg = errorToMessage(body?.message || body) || `HTTP ${res.status}`;
+        if (res.status === 409 && /已有扫描任务在运行/.test(msg) && attempt === 0) {
+          await ensureBackendTaskIdle();
+          continue;
+        }
+        throw new Error(msg);
+      }
+      throw new Error('启动后端扫描失败，请稍后重试。');
+    }
+
+    async function waitForBackendCompletion(taskId) {
+      while (true) {
+        if (stopRequested) {
+          try { await stopBackendScan(); } catch {}
+        }
+        const snapshot = await fetchBackendStatus();
+        if (Number(snapshot.code || 200) !== 200) {
+          throw new Error(errorToMessage(snapshot?.message || snapshot));
+        }
+        if (taskId && String(snapshot.id || '') !== String(taskId)) {
+          throw new Error('后端扫描任务已被替换，请重新开始。');
+        }
+        applyBackendSnapshot(snapshot);
+        if (!snapshot.running) {
+          return snapshot;
+        }
+        await sleep(900);
+      }
+    }
+
+    function escapeHtml(text) {
+      return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function loadSettings() {
+      try {
+        const obj = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+        try {
+          const legacyRestoreFlag = localStorage.getItem('restored_from_file_20260114_v1');
+          const healedFlag = localStorage.getItem('enhanced_follow_source_recovered_v1');
+          if (legacyRestoreFlag && !healedFlag) {
+            let changed = false;
+            if (!obj.useAggregate) { obj.useAggregate = true; changed = true; }
+            if (obj.skipRescanNextOnce) { obj.skipRescanNextOnce = false; changed = true; }
+            if (obj.ignoreSkip) { obj.ignoreSkip = false; changed = true; }
+            if (obj.alwaysRefreshFollowed) { obj.alwaysRefreshFollowed = false; changed = true; }
+            if (changed) {
+              localStorage.setItem(LS_KEY, JSON.stringify(obj));
+            }
+            localStorage.setItem('enhanced_follow_source_recovered_v1', 'done');
+          }
+          try { localStorage.removeItem('follow_source_refresh_once_v1'); } catch {}
+        } catch {}
+        if (typeof obj.scanBackendBase !== 'string') obj.scanBackendBase = '';
+        if (typeof obj.corsProxyBase !== 'string') obj.corsProxyBase = '';
+        if (typeof obj.apiBase !== 'string') obj.apiBase = '';
+        if (typeof obj.cookie !== 'string') obj.cookie = '';
+        obj.useAggregate = Boolean(obj.useAggregate);
+        obj.alwaysRefreshFollowed = Boolean(obj.alwaysRefreshFollowed);
+        obj.skipRescanNextOnce = Boolean(obj.skipRescanNextOnce);
+        obj.useCachedPlaylistArtists = Boolean(obj.useCachedPlaylistArtists);
+        obj.onlyShowFollowedInFeed = Boolean(obj.onlyShowFollowedInFeed);
+        obj.reuseArtistCache = Boolean(obj.reuseArtistCache);
+        obj.smartScan = obj.smartScan !== undefined ? Boolean(obj.smartScan) : true;
+        obj.playlistSource = String(obj.playlistSource || '').trim();
+        obj.manualArtistIds = Array.isArray(obj.manualArtistIds)
+          ? obj.manualArtistIds.map(Number).filter(id => Number.isFinite(id) && id > 0)
+          : [];
+        obj.aggregateCookies = Array.isArray(obj.aggregateCookies)
+          ? obj.aggregateCookies.map(item => String(item || '').trim()).filter(Boolean)
+          : [];
+        return obj;
+      } catch {
+        return { scanBackendBase: '', corsProxyBase: '', apiBase: '', cookie: '' };
+      }
+    }
+
+    function fillFromSavedSettings() {
+      const s = loadSettings();
+      if (els.scanBackendBase) els.scanBackendBase.value = String(s.scanBackendBase || '').trim();
+      els.apiBase.value = String(s.apiBase || 'http://127.0.0.1:3000').trim();
+      els.cookie.value = String(s.cookie || '').trim();
+    }
+
+    function safeJsonText(value) {
+      if (value == null) return '';
+      if (typeof value === 'string') return value;
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+
+    function errorToMessage(err) {
+      if (err instanceof Error) {
+        const msg = typeof err.message === 'string' ? err.message.trim() : safeJsonText(err.message);
+        if (msg && msg !== '[object Object]') return msg;
+        try {
+          const full = JSON.stringify(err, Object.getOwnPropertyNames(err));
+          if (full && full !== '{}' && full !== '[object Object]') return full;
+        } catch {}
+      }
+      if (typeof err === 'string' && err.trim()) {
+        return err.trim();
+      }
+      if (err && typeof err === 'object') {
+        const msg = err.message ?? err.msg ?? err.error ?? err.detail;
+        const text = safeJsonText(msg || err);
+        if (text && text !== '[object Object]') {
+          return text;
+        }
+      }
+      return String(err || '未知错误');
+    }
+
+    function defaultDateRange() {
+      const today = new Date();
+      const end = today.toISOString().slice(0, 10);
+      const start = new Date(today.getTime() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      els.startDate.value = start;
+      els.endDate.value = end;
+      updateRangeChip();
+    }
+
+    function updateRangeChip() {
+      const start = els.startDate.value || '未设置';
+      const end = els.endDate.value || '未设置';
+      els.rangeChip.textContent = `日期范围：${start} ~ ${end}`;
+    }
+
+    function updateModeChip() {
+      const text = els.manualArtists.value.trim()
+        ? '模式：手动艺人 ID'
+        : '模式：关注艺人扫描';
+      els.modeChip.textContent = text;
+    }
+
+    function headersForCfg(cfg) {
+      return cfg.cookie ? { 'x-ncm-cookie': cfg.cookie } : undefined;
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function withRetries(taskLabel, fn, options = {}) {
+      const attempts = Math.max(1, Number(options.attempts) || 2);
+      const delayMs = Math.max(0, Number(options.delayMs) || 500);
+      let lastError = null;
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+          return await fn();
+        } catch (err) {
+          const msg = errorToMessage(err);
+          if (msg === '__STOP__' || msg.includes('未登录') || msg.includes('301') || msg.includes('需要登录')) {
+            throw err;
+          }
+          lastError = err;
+          if (attempt >= attempts) break;
+          log(`${taskLabel} 失败，准备重试 (${attempt}/${attempts - 1})：${msg}`, 'warn');
+          await sleep(delayMs * attempt);
+        }
+      }
+      throw lastError || new Error(`${taskLabel} 失败`);
+    }
+
+    function normalizeArtistEntries(items) {
+      const seen = new Set();
+      const list = [];
+      for (const item of Array.isArray(items) ? items : []) {
+        const id = Number(item?.id || item?.artistId || item);
+        if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+        seen.add(id);
+        list.push({
+          id,
+          name: String(item?.name || item?.artistName || '').trim() || `艺人 ${id}`
+        });
+      }
+      return list;
+    }
+
+    function extractPlaylistId(input) {
+      const text = String(input || '').trim();
+      if (!text) return '';
+      if (/^\d+$/.test(text)) return text;
+      const match = text.match(/[?&]id=(\d+)/) || text.match(/playlist\/(\d+)/) || text.match(/\/playlist\?id=(\d+)/);
+      return match ? match[1] : '';
+    }
+
+    function readJsonCache(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function loadOwnedAlbumCacheMap() {
+      const raw = readJsonCache(OWNED_ALBUM_CACHE_KEY);
+      return raw && typeof raw === 'object' ? raw : {};
+    }
+
+    function readOwnedAlbumCache(artistId) {
+      const all = loadOwnedAlbumCacheMap();
+      const entry = all[String(artistId)];
+      if (!entry || !Array.isArray(entry.ids)) return null;
+      const ttlMs = 7 * 24 * 3600 * 1000;
+      if (Date.now() - Number(entry.ts || 0) > ttlMs) return null;
+      return new Set(entry.ids.map(Number).filter(id => Number.isFinite(id) && id > 0));
+    }
+
+    function writeOwnedAlbumCache(artistId, ids) {
+      try {
+        const all = loadOwnedAlbumCacheMap();
+        all[String(artistId)] = {
+          ids: Array.from(new Set(Array.from(ids).map(Number).filter(id => Number.isFinite(id) && id > 0))),
+          ts: Date.now()
+        };
+        localStorage.setItem(OWNED_ALBUM_CACHE_KEY, JSON.stringify(all));
+      } catch {}
+    }
+
+    function formatAge(ts) {
+      const ageMs = Date.now() - Number(ts || 0);
+      if (!Number.isFinite(ageMs) || ageMs < 0) return '未知';
+      const minutes = Math.floor(ageMs / 60000);
+      if (minutes < 1) return '刚刚';
+      if (minutes < 60) return `${minutes} 分钟前`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours} 小时前`;
+      return `${Math.floor(hours / 24)} 天前`;
+    }
+
+    function readFollowCache() {
+      try {
+        const raw = localStorage.getItem(FOLLOW_CACHE_KEY);
+        if (!raw) return [];
+        const obj = JSON.parse(raw);
+        if (!obj || !Array.isArray(obj.ids)) return [];
+        if (Date.now() - Number(obj.ts || 0) >= 24 * 3600 * 1000) return [];
+        return normalizeArtistEntries(obj.ids);
+      } catch {
+        return [];
+      }
+    }
+
+    async function loadOwnedArtistSourceCache() {
+      try {
+        const res = await fetch(resolveScanApi(VA_OWNED_ARTIST_CACHE_ENDPOINT), {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = await res.json();
+        const ids = Array.isArray(body?.ids)
+          ? body.ids.map(Number).filter(id => Number.isFinite(id) && id > 0)
+          : [];
+        return normalizeArtistEntries(ids);
+      } catch (err) {
+        log(`本地 9000+ 艺人大缓存读取失败：${errorToMessage(err)}`, 'warn');
+        return [];
+      }
+    }
+
+    async function loadPersistedAlbumCache() {
+      try {
+        const res = await fetch(resolveScanApi(VA_ALBUM_CACHE_ENDPOINT), {
+          method: 'GET',
+          credentials: 'include'
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const body = await res.json();
+        const items = body && typeof body.items === 'object' && body.items ? body.items : {};
+        let count = 0;
+        for (const [albumId, value] of Object.entries(items)) {
+          const id = Number(albumId);
+          const publishTime = Number(value?.publishTime || 0);
+          if (!Number.isFinite(id) || id <= 0) continue;
+          albumDateCache.set(id, {
+            publishTime,
+            date: String(value?.date || '')
+          });
+          count += 1;
+        }
+        scheduleUiFlush({ albumCount: albumDateCache.size });
+        return count;
+      } catch (err) {
+        log(`专辑日期持久缓存读取失败：${errorToMessage(err)}`, 'warn');
+        return 0;
+      }
+    }
+
+    async function flushAlbumCachePersist(force) {
+      if (albumCachePersistPromise && !force) return albumCachePersistPromise;
+      if (albumCachePersistTimer) {
+        clearTimeout(albumCachePersistTimer);
+        albumCachePersistTimer = null;
+      }
+      const batch = pendingAlbumCachePersist;
+      pendingAlbumCachePersist = {};
+      const entries = Object.keys(batch);
+      if (!entries.length) return null;
+      albumCachePersistPromise = fetch(resolveScanApi(VA_ALBUM_CACHE_ENDPOINT), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ items: batch })
+      }).then(async res => {
+        let body = {};
+        try {
+          body = await res.json();
+        } catch {}
+        if (!res.ok || Number(body?.code || 200) !== 200) {
+          throw new Error(errorToMessage(body?.message || body));
+        }
+      }).catch(err => {
+        pendingAlbumCachePersist = { ...batch, ...pendingAlbumCachePersist };
+        log(`专辑日期缓存写回失败：${errorToMessage(err)}`, 'warn');
+      }).finally(() => {
+        albumCachePersistPromise = null;
+      });
+      return albumCachePersistPromise;
+    }
+
+    function queueAlbumCachePersist(albumId, value) {
+      pendingAlbumCachePersist[String(albumId)] = {
+        publishTime: Number(value?.publishTime || 0),
+        date: String(value?.date || '')
+      };
+      if (Object.keys(pendingAlbumCachePersist).length >= ALBUM_CACHE_FLUSH_SIZE) {
+        flushAlbumCachePersist(false);
+        return;
+      }
+      if (!albumCachePersistTimer) {
+        albumCachePersistTimer = setTimeout(() => {
+          albumCachePersistTimer = null;
+          flushAlbumCachePersist(false);
+        }, ALBUM_CACHE_FLUSH_MS);
+      }
+    }
+
+    function writeFollowCache(items) {
+      try {
+        localStorage.setItem(FOLLOW_CACHE_KEY, JSON.stringify({
+          ids: normalizeArtistEntries(items),
+          ts: Date.now()
+        }));
+      } catch {}
+    }
+
+    async function fetchJSON(url, cfg, opts = {}) {
+      const controller = new AbortController();
+      const timeout = Math.max(1000, Number(opts.timeout) || 15000);
+      const timer = setTimeout(() => controller.abort(), timeout);
+      let res;
+      try {
+        res = await fetch(url, {
+          headers: headersForCfg(cfg),
+          credentials: cfg.cookie ? 'omit' : 'include',
+          signal: controller.signal
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        if (err?.name === 'AbortError') {
+          throw new Error(`请求超时：${url}`);
+        }
+        throw new Error(`无法连接到 API：${url}。请确认 ${cfg.apiBase} 已启动且可访问。原始错误：${err?.message || err}`);
+      }
+      clearTimeout(timer);
+      const text = await res.text();
+      let body = {};
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch {
+          throw new Error(text.slice(0, 180) || `请求失败 ${res.status}`);
+        }
+      }
+      if (!res.ok) {
+        throw new Error(errorToMessage(body.msg || body.message || body) || `HTTP ${res.status}`);
+      }
+      const code = Number(body.code || 200);
+      if (code !== 200) {
+        throw new Error(errorToMessage(body.msg || body.message || body) || `接口返回 code=${code}`);
+      }
+      return body;
+    }
+
+    function normalizeArtistIds(text) {
+      return Array.from(new Set(
+        String(text || '')
+          .split(/[,\n\r\t ]+/)
+          .map(x => Number(x.trim()))
+          .filter(x => Number.isFinite(x) && x > 0)
+      ));
+    }
+
+    function dateOnlyMs(text, endOfDay) {
+      const value = String(text || '').trim();
+      if (!value) return NaN;
+      return new Date(`${value}T${endOfDay ? '23:59:59' : '00:00:00'}`).getTime();
+    }
+
+    function formatElapsed(ms) {
+      const sec = Math.max(0, Math.floor(ms / 1000));
+      const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      return `${mm}:${ss}`;
+    }
+
+    function setBusy(busy) {
+      els.startBtn.disabled = busy;
+      els.stopBtn.disabled = !busy;
+      els.exportBtn.disabled = busy || currentResults.length === 0;
+    }
+
+    function updateProgress(done, total, statusText) {
+      const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+      els.progressFill.style.width = `${percent}%`;
+      els.status.textContent = statusText || `进度 ${done}/${total}`;
+    }
+
+    function resetForRun() {
+      stopRequested = false;
+      backendTaskId = '';
+      currentResults = [];
+      albumDateCache = new Map();
+      albumDateInflight = new Map();
+      openAlbumCards = new Set();
+      pendingAlbumCachePersist = {};
+      if (albumCachePersistTimer) {
+        clearTimeout(albumCachePersistTimer);
+        albumCachePersistTimer = null;
+      }
+      albumCachePersistPromise = null;
+      albumCacheHitCount = 0;
+      albumCacheMissCount = 0;
+      latestDone = 0;
+      latestTotal = 0;
+      latestHits = 0;
+      latestAlbumCount = 0;
+      latestStatusText = '扫描中...';
+      latestRenderItems = [];
+      logEntries = ['<span>[系统] 已开始新一轮扫描</span>'];
+      if (logFlushTimer) {
+        clearTimeout(logFlushTimer);
+        logFlushTimer = null;
+      }
+      if (uiFlushTimer) {
+        clearTimeout(uiFlushTimer);
+        uiFlushTimer = null;
+      }
+      els.results.innerHTML = '<div class="empty">扫描中…</div>';
+      els.statArtists.textContent = '0';
+      els.statHits.textContent = '0';
+      els.statResultAlbums.textContent = '0';
+      els.statAlbums.textContent = '0';
+      els.progressFill.style.width = '0%';
+      els.summaryHint.textContent = '结果会按发行日期倒序展示。';
+      els.log.innerHTML = logEntries.join('\n');
+      scanStartedAt = Date.now();
+      if (elapsedTimer) clearInterval(elapsedTimer);
+      elapsedTimer = setInterval(() => {
+        els.statElapsed.textContent = formatElapsed(Date.now() - scanStartedAt);
+      }, 500);
+    }
+
+    function finishRun() {
+      flushUiNow();
+      if (logFlushTimer) {
+        clearTimeout(logFlushTimer);
+        flushLog();
+      }
+      if (elapsedTimer) {
+        clearInterval(elapsedTimer);
+        elapsedTimer = null;
+      }
+      flushAlbumCachePersist(true);
+      els.statElapsed.textContent = formatElapsed(Date.now() - scanStartedAt);
+      setBusy(false);
+      els.exportBtn.disabled = currentResults.length === 0;
+    }
+
+    function groupResultsByAlbum(items) {
+      const grouped = new Map();
+      for (const item of Array.isArray(items) ? items : []) {
+        const key = String(item.albumId || item.albumLink || item.songLink);
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            groupKey: key,
+            albumId: item.albumId,
+            albumName: item.albumName,
+            albumLink: item.albumLink,
+            albumPicUrl: item.albumPicUrl || '',
+            publishTime: Number(item.publishTime || 0),
+            date: item.date,
+            artistNames: new Set(),
+            tracks: []
+          });
+        }
+        const bucket = grouped.get(key);
+        if (item.artistName) bucket.artistNames.add(String(item.artistName));
+        if (!bucket.tracks.some(track => track.songId === item.songId || track.songLink === item.songLink)) {
+          bucket.tracks.push({
+            songId: item.songId,
+            songName: item.songName,
+            songLink: item.songLink
+          });
+        }
+        if (!bucket.albumPicUrl && item.albumPicUrl) bucket.albumPicUrl = item.albumPicUrl;
+        if (!bucket.publishTime && item.publishTime) bucket.publishTime = Number(item.publishTime || 0);
+        if (!bucket.date && item.date) bucket.date = item.date;
+      }
+      return Array.from(grouped.values()).map(item => ({
+        ...item,
+        artistName: Array.from(item.artistNames).join(' / ')
+      }));
+    }
+
+    function renderResults(items) {
+      if (!items.length) {
+        els.statResultAlbums.textContent = '0';
+        els.results.innerHTML = els.startBtn.disabled
+          ? '<div class="empty">扫描中，暂未发现结果专辑。</div>'
+          : '<div class="empty">在当前日期范围内没有发现合辑单曲。</div>';
+        return;
+      }
+      const grouped = groupResultsByAlbum(items);
+      const sorted = [...grouped].sort((a, b) => {
+        const diff = Number(b.publishTime || 0) - Number(a.publishTime || 0);
+        if (diff !== 0) return diff;
+        return String(b.date || '').localeCompare(String(a.date || ''));
+      });
+      els.statResultAlbums.textContent = String(sorted.length);
+      els.results.innerHTML = sorted.map(item => `
+        <article class="card" data-album-key="${escapeHtml(item.groupKey)}">
+          <div class="cover">
+            <img src="${escapeHtml(item.albumPicUrl || 'https://p5.music.126.net/obj/wonDlsKUwrLClGjCm8Kx/13657931954/4f89/ba28/6fdf/2f0ed8d1227bcddc3e39fb8bcbac2bfe.png')}" alt="${escapeHtml(item.albumName)}" loading="lazy" />
+          </div>
+          <span class="badge">合辑单曲命中</span>
+          <div class="title">${escapeHtml(item.albumName)}</div>
+          <div class="artist">${escapeHtml(item.artistName || '未知艺人')} · 合辑 / 专辑</div>
+          <div class="meta">发行日期：${escapeHtml(item.date)}</div>
+          <details data-album-key="${escapeHtml(item.groupKey)}" ${openAlbumCards.has(item.groupKey) ? 'open' : ''}>
+            <summary>命中单曲 (${item.tracks.length})</summary>
+            <ul class="track-list">
+              ${item.tracks.map(track => `
+                <li><a href="${escapeHtml(track.songLink)}" target="_blank" rel="noopener">${escapeHtml(track.songName)}</a></li>
+              `).join('')}
+            </ul>
+          </details>
+          <div class="links">
+            <a href="${escapeHtml(item.tracks[0]?.songLink || item.albumLink)}" target="_blank" rel="noopener">打开单曲</a>
+            <a href="${escapeHtml(item.albumLink)}" target="_blank" rel="noopener">打开专辑</a>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    async function fetchFollowedArtistsBySublist(cfg) {
+      const all = [];
+      const seen = new Set();
+      const limit = 200;
+      let offset = 0;
+      let hasMore = true;
+      let consecutiveErrors = 0;
+
+      while (hasMore && !stopRequested) {
+        const url = new URL('/artist/sublist', cfg.apiBase);
+        url.searchParams.set('limit', String(limit));
+        url.searchParams.set('offset', String(offset));
+        url.searchParams.set('timestamp', String(Date.now()));
+        try {
+          const data = await fetchJSON(url.toString(), cfg, { timeout: 15000 });
+          consecutiveErrors = 0;
+          const list = Array.isArray(data?.data)
+            ? data.data
+            : (Array.isArray(data?.artists) ? data.artists : (Array.isArray(data?.list) ? data.list : []));
+          const listLen = list.length;
+
+          if (!Array.isArray(list) || listLen === 0) {
+            hasMore = false;
+            continue;
+          }
+
+          let newCount = 0;
+          for (const item of list) {
+            const id = Number(item?.id || item?.artistId);
+            if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+            seen.add(id);
+            all.push({
+              id,
+              name: String(item?.name || '').trim() || `艺人 ${id}`
+            });
+            newCount += 1;
+          }
+
+          if (typeof data.more === 'boolean') hasMore = data.more;
+          else if (typeof data.hasMore === 'boolean') hasMore = data.hasMore;
+          else if (listLen < limit) hasMore = false;
+
+          if (newCount === 0 && listLen > 0 && all.length > 20000) {
+            hasMore = false;
+          }
+
+          if (hasMore) {
+            offset += (listLen > 0 ? listLen : limit);
+            await sleep(100);
+          }
+        } catch (err) {
+          consecutiveErrors += 1;
+          const msg = errorToMessage(err);
+          if (msg.includes('未登录') || msg.includes('301') || msg.includes('需要登录')) {
+            throw new Error(`无法获取关注列表：${msg}。请检查 Cookie 是否过期。`);
+          }
+          if (consecutiveErrors >= 5) {
+            break;
+          }
+          log(`关注列表分页获取失败，准备重试 (${consecutiveErrors}/5)：${msg}`, 'warn');
+          await sleep(1200);
+        }
+      }
+
+      if (!all.length && consecutiveErrors >= 5) {
+        throw new Error('关注列表获取失败：连续请求异常，请检查 API 地址、Cookie 或网络连通性。');
+      }
+      return all;
+    }
+
+    async function fetchFollowedArtistsByAggregate(cfg) {
+      const url = new URL('/artist/sublist/aggregate', cfg.apiBase);
+      url.searchParams.set('limit', '200');
+      url.searchParams.set('maxPages', '200');
+      url.searchParams.set('spinLimit', '8');
+      url.searchParams.set('timestampMode', 'now');
+      if (cfg.aggregateCookies.length) {
+        url.searchParams.set('cookies', JSON.stringify(cfg.aggregateCookies));
+      }
+      const data = await fetchJSON(url.toString(), cfg, { timeout: 30000 });
+      const ids = Array.isArray(data?.ids) ? data.ids : [];
+      const cached = readFollowCache();
+      const cachedNameMap = new Map(cached.map(item => [item.id, item.name]));
+      return normalizeArtistEntries(ids.map(id => ({
+        id,
+        name: cachedNameMap.get(Number(id)) || `艺人 ${id}`
+      })));
+    }
+
+    async function fetchFollowedArtists(cfg) {
+      if (!cfg.alwaysRefreshFollowed) {
+        const cached = readFollowCache();
+        if (cached.length) {
+          log(`复用增强页共享关注缓存：${cached.length} 位艺人`, 'ok');
+          return cached;
+        }
+      }
+
+      let artists = [];
+      if (cfg.useAggregate) {
+        try {
+          artists = await fetchFollowedArtistsByAggregate(cfg);
+          if (artists.length) {
+            log(`已通过聚合关注列表获取 ${artists.length} 位艺人`, 'ok');
+          }
+        } catch (err) {
+          log(`聚合关注列表获取失败，回退普通分页：${errorToMessage(err)}`, 'warn');
+        }
+      }
+
+      if (!artists.length) {
+        artists = await fetchFollowedArtistsBySublist(cfg);
+      }
+
+      if (artists.length) {
+        writeFollowCache(artists);
+      }
+      return artists;
+    }
+
+    async function fetchPlaylistArtistIds(cfg, sourceInput) {
+      const playlistId = extractPlaylistId(sourceInput);
+      if (!cfg.apiBase || !playlistId) return [];
+      let totalTracks = null;
+      let detail = null;
+      const startTime = Date.now();
+      const hardTimeoutMs = 25000;
+      const artistIds = new Set();
+      let fallbackToSongDetail = false;
+      let offset = 0;
+      const limit = 1000;
+      let consecutiveFail = 0;
+
+      try {
+        const url = new URL(`/playlist/detail?id=${playlistId}`, cfg.apiBase);
+        if (cfg.cookie) url.searchParams.set('cookie', cfg.cookie);
+        url.searchParams.set('s', '1000');
+        detail = await fetchJSON(url.toString(), cfg);
+        const pl0 = detail?.playlist || detail?.result?.playlist || null;
+        totalTracks = Number(pl0?.trackCount) || null;
+      } catch {}
+
+      for (let page = 0; page < 100 && !stopRequested; page += 1) {
+        if (Date.now() - startTime > hardTimeoutMs && artistIds.size === 0) {
+          fallbackToSongDetail = true;
+          break;
+        }
+        const u = new URL('/playlist/track/all', cfg.apiBase);
+        u.searchParams.set('id', String(playlistId));
+        u.searchParams.set('limit', String(limit));
+        u.searchParams.set('offset', String(offset));
+        if (cfg.cookie) u.searchParams.set('cookie', cfg.cookie);
+        try {
+          const d = await fetchJSON(u.toString(), cfg, { timeout: 15000 });
+          consecutiveFail = 0;
+          const songs = Array.isArray(d?.songs) ? d.songs : [];
+          if (!songs.length) break;
+          for (const s of songs) {
+            const ars = Array.isArray(s?.ar) ? s.ar : (Array.isArray(s?.artists) ? s.artists : []);
+            for (const a of ars) {
+              const id = Number(a?.id);
+              if (Number.isFinite(id) && id > 0) artistIds.add(id);
+            }
+          }
+          offset += limit;
+          log(`歌单艺人解析中：已扫描曲目 ${Math.min(offset, totalTracks || offset)} / ${totalTracks || '未知'}（ID=${playlistId}）`, 'warn');
+          await sleep(120);
+          if (Number.isFinite(totalTracks) && offset >= totalTracks) break;
+        } catch (err) {
+          consecutiveFail += 1;
+          const msg = errorToMessage(err);
+          if (msg.includes('未登录') || msg.includes('301') || msg.includes('需要登录')) {
+            throw new Error(`歌单扫描失败：${msg}。请检查 Cookie。`);
+          }
+          if (consecutiveFail >= 3) {
+            fallbackToSongDetail = true;
+            break;
+          }
+          log(`歌单曲目接口失败，准备重试 (${consecutiveFail}/3)：${msg}`, 'warn');
+          await sleep(600);
+        }
+      }
+
+      if (fallbackToSongDetail && !stopRequested) {
+        try {
+          if (!detail) {
+            const url = new URL(`/playlist/detail?id=${playlistId}`, cfg.apiBase);
+            if (cfg.cookie) url.searchParams.set('cookie', cfg.cookie);
+            url.searchParams.set('s', Number.isFinite(totalTracks) && totalTracks > 0 ? String(Math.min(totalTracks, 2000)) : '1000');
+            detail = await fetchJSON(url.toString(), cfg, { timeout: 15000 });
+          }
+        } catch {}
+
+        const pl = detail?.playlist || detail?.result?.playlist || {};
+        const trackIdsArr = Array.isArray(pl?.trackIds) ? pl.trackIds.map(x => Number(x?.id)).filter(id => Number.isFinite(id) && id > 0) : [];
+
+        if (!trackIdsArr.length) {
+          const tracks = Array.isArray(pl?.tracks) ? pl.tracks : [];
+          for (const s of tracks) {
+            const ars = Array.isArray(s?.ar) ? s.ar : (Array.isArray(s?.artists) ? s.artists : []);
+            for (const a of ars) {
+              const id = Number(a?.id);
+              if (Number.isFinite(id) && id > 0) artistIds.add(id);
+            }
+          }
+        } else {
+          const chunkSize = 500;
+          let fallbackFails = 0;
+          for (let i = 0; i < trackIdsArr.length && !stopRequested; i += chunkSize) {
+            const chunk = trackIdsArr.slice(i, i + chunkSize);
+            const uu = new URL('/song/detail', cfg.apiBase);
+            uu.searchParams.set('ids', chunk.join(','));
+            if (cfg.cookie) uu.searchParams.set('cookie', cfg.cookie);
+            try {
+              const sd = await fetchJSON(uu.toString(), cfg, { timeout: 15000 });
+              fallbackFails = 0;
+              const songs = Array.isArray(sd?.songs) ? sd.songs : [];
+              for (const s of songs) {
+                const ars = Array.isArray(s?.ar) ? s.ar : (Array.isArray(s?.artists) ? s.artists : []);
+                for (const a of ars) {
+                  const id = Number(a?.id);
+                  if (Number.isFinite(id) && id > 0) artistIds.add(id);
+                }
+              }
+              log(`歌单回退解析中：已解析曲目 ${Math.min(i + chunkSize, trackIdsArr.length)} / ${trackIdsArr.length}（ID=${playlistId}）`, 'warn');
+              await sleep(120);
+            } catch (err) {
+              fallbackFails += 1;
+              const msg = errorToMessage(err);
+              if (msg.includes('未登录') || msg.includes('301') || msg.includes('需要登录')) {
+                throw new Error(`歌单回退解析失败：${msg}`);
+              }
+              if (fallbackFails >= 3) break;
+              log(`歌单回退解析失败，准备重试 (${fallbackFails}/3)：${msg}`, 'warn');
+              await sleep(800);
+            }
+          }
+        }
+      }
+
+      return Array.from(artistIds);
+    }
+
+    async function resolveArtistsForSniffer(cfg) {
+      const manual = Array.isArray(cfg.manualArtistIds) ? cfg.manualArtistIds : [];
+      let followed = [];
+      let playlistIds = [];
+      let reusedFollowCache = false;
+      let reusedPlaylistCache = false;
+      let reusedOwnedArtistCache = false;
+      const followObj = readJsonCache(FOLLOW_CACHE_KEY);
+      const playlistObj = readJsonCache(PLAYLIST_CACHE_KEY);
+      const forceRefreshForSmartScan = cfg.smartScan && !cfg.skipRescanNextOnce;
+
+      if (cfg.skipRescanNextOnce) {
+        const cached = normalizeArtistEntries(followObj?.ids);
+        if (cached.length) {
+          followed = cached;
+          reusedFollowCache = true;
+          log(`按增强页 skipRescanNextOnce 设置，直接使用关注缓存 ${cached.length} 位`, 'ok');
+        }
+      }
+
+      if (!reusedFollowCache && !cfg.alwaysRefreshFollowed && !forceRefreshForSmartScan) {
+        const cached = readFollowCache();
+        if (cached.length) {
+          followed = cached;
+          reusedFollowCache = true;
+          log(`按增强页设置复用关注缓存 ${cached.length} 位`, 'ok');
+        }
+      }
+
+      const ownedArtistSource = await loadOwnedArtistSourceCache();
+      if (ownedArtistSource.length >= 9000 && ownedArtistSource.length > followed.length) {
+        followed = ownedArtistSource;
+        reusedFollowCache = true;
+        reusedOwnedArtistCache = true;
+        log(`优先使用本地 9000+ 艺人大缓存 ${ownedArtistSource.length} 位`, 'ok');
+      }
+
+      if (!reusedFollowCache) {
+        log(`按增强页逻辑同步关注列表${cfg.useAggregate ? '（聚合模式）' : ''}...`, 'warn');
+        followed = await fetchFollowedArtists(cfg);
+      }
+
+      if (cfg.playlistSource && !cfg.onlyShowFollowedInFeed) {
+        const currentPlaylistId = extractPlaylistId(cfg.playlistSource);
+        if (cfg.useCachedPlaylistArtists || cfg.reuseArtistCache || cfg.skipRescanNextOnce || currentPlaylistId) {
+          const sourceMatches = String(playlistObj?.sourceId || '') === String(currentPlaylistId || '');
+          const cachedPlaylistIds = Array.isArray(playlistObj?.ids)
+            ? (sourceMatches ? playlistObj.ids.map(Number).filter(id => Number.isFinite(id) && id > 0) : [])
+            : [];
+          if (cachedPlaylistIds.length) {
+            playlistIds = cachedPlaylistIds;
+            reusedPlaylistCache = true;
+            log(`按增强页设置复用歌单艺人缓存 ${playlistIds.length} 位`, 'ok');
+          }
+        }
+
+        if (!reusedPlaylistCache) {
+          log('未命中歌单缓存，已跳过自动解析歌单。', 'warn');
+          playlistIds = [];
+        }
+      }
+
+      if (cfg.onlyShowFollowedInFeed) {
+        return {
+          artists: normalizeArtistEntries(followed),
+          sourceLabel: reusedOwnedArtistCache ? '本地 9000+ 艺人大缓存' : (reusedFollowCache ? '关注缓存' : '关注艺人')
+        };
+      }
+
+      const merged = new Map();
+      manual.forEach(id => {
+        if (Number.isFinite(Number(id))) merged.set(Number(id), { id: Number(id), name: `艺人 ${id}` });
+      });
+      normalizeArtistEntries(followed).forEach(item => {
+        if (!merged.has(item.id)) merged.set(item.id, item);
+      });
+      playlistIds.forEach(item => {
+        const id = Number(item);
+        if (Number.isFinite(id) && id > 0 && !merged.has(id)) merged.set(id, { id, name: `艺人 ${id}` });
+      });
+
+      const parts = [];
+      if (manual.length) parts.push(`手动 ${manual.length}`);
+      if (followed.length) parts.push(`${reusedOwnedArtistCache ? '本地大缓存' : (reusedFollowCache ? '关注缓存' : '关注')} ${followed.length}`);
+      if (playlistIds.length) parts.push(`${reusedPlaylistCache ? '歌单缓存' : '歌单'} ${playlistIds.length}`);
+
+      return {
+        artists: Array.from(merged.values()),
+        sourceLabel: parts.join(' + ') || '增强页逻辑'
+      };
+    }
+
+    async function fetchArtistAlbums(cfg, artistId) {
+      const cached = readOwnedAlbumCache(artistId);
+      if (cached) {
+        return cached;
+      }
+      return withRetries(`艺人 ${artistId} 的所属专辑列表`, async () => {
+        const url = new URL('/artist/album', cfg.apiBase);
+        url.searchParams.set('id', String(artistId));
+        url.searchParams.set('limit', '100');
+        const data = await fetchJSON(url.toString(), cfg);
+        const list = Array.isArray(data.hotAlbums) ? data.hotAlbums : [];
+        const ids = new Set(list.map(item => Number(item.id)).filter(id => Number.isFinite(id) && id > 0));
+        writeOwnedAlbumCache(artistId, ids);
+        return ids;
+      }, { attempts: 2, delayMs: 350 });
+    }
+
+    async function fetchArtistSongs(cfg, artistId, songsLimit) {
+      return withRetries(`艺人 ${artistId} 的最近单曲`, async () => {
+        const url = new URL('/artist/songs', cfg.apiBase);
+        url.searchParams.set('id', String(artistId));
+        url.searchParams.set('order', 'time');
+        url.searchParams.set('limit', String(songsLimit));
+        const data = await fetchJSON(url.toString(), cfg);
+        return Array.isArray(data.songs) ? data.songs : [];
+      }, { attempts: 2, delayMs: 350 });
+    }
+
+    async function fetchAlbumDate(cfg, albumId) {
+      if (albumDateCache.has(albumId)) {
+        albumCacheHitCount += 1;
+        return albumDateCache.get(albumId);
+      }
+      if (albumDateInflight.has(albumId)) {
+        return albumDateInflight.get(albumId);
+      }
+      albumCacheMissCount += 1;
+      const task = (async () => {
+        const data = await withRetries(`专辑 ${albumId} 的发行日期`, async () => {
+          const url = new URL('/album', cfg.apiBase);
+          url.searchParams.set('id', String(albumId));
+          return fetchJSON(url.toString(), cfg);
+        }, { attempts: 2, delayMs: 300 });
+        const publishTime = Number(data.album?.publishTime || 0);
+        const date = publishTime ? new Date(publishTime).toISOString().slice(0, 10) : '';
+        const cached = { publishTime, date };
+        albumDateCache.set(albumId, cached);
+        if (publishTime) {
+          queueAlbumCachePersist(albumId, cached);
+        }
+        scheduleUiFlush({ albumCount: albumDateCache.size });
+        return cached;
+      })().finally(() => {
+        albumDateInflight.delete(albumId);
+      });
+      albumDateInflight.set(albumId, task);
+      return task;
+    }
+
+    function resolveArtistNameFromSong(song, fallbackArtist) {
+      const artists = Array.isArray(song?.ar) ? song.ar : (Array.isArray(song?.artists) ? song.artists : []);
+      const targetId = Number(fallbackArtist?.id || 0);
+      if (targetId > 0) {
+        const matched = artists.find(item => Number(item?.id) === targetId);
+        const matchedName = String(matched?.name || '').trim();
+        if (matchedName) return matchedName;
+      }
+      const firstName = String(artists[0]?.name || '').trim();
+      if (firstName) return firstName;
+      const fallbackName = String(fallbackArtist?.name || '').trim();
+      return fallbackName || `艺人 ${targetId || ''}`.trim();
+    }
+
+    async function scanSingleArtist(cfg, artist, rangeStart, rangeEnd, songsLimit) {
+      const songs = await fetchArtistSongs(cfg, artist.id, songsLimit);
+      if (!songs.length) {
+        return [];
+      }
+      const ownedAlbumIds = await fetchArtistAlbums(cfg, artist.id);
+      const seenAlbumIds = new Set();
+      const candidates = [];
+      for (const song of songs) {
+        if (stopRequested) throw new Error('__STOP__');
+        const albumId = Number(song?.al?.id || 0);
+        if (!albumId || ownedAlbumIds.has(albumId) || seenAlbumIds.has(albumId)) continue;
+        seenAlbumIds.add(albumId);
+        const { publishTime, date } = await fetchAlbumDate(cfg, albumId);
+        if (!publishTime || publishTime < rangeStart || publishTime > rangeEnd) continue;
+        for (const matchedSong of songs) {
+          const matchedAlbumId = Number(matchedSong?.al?.id || 0);
+          if (matchedAlbumId !== albumId) continue;
+          candidates.push({
+            artistId: artist.id,
+            artistName: resolveArtistNameFromSong(matchedSong, artist),
+            songId: Number(matchedSong.id) || 0,
+            songName: String(matchedSong.name || '未命名单曲'),
+            albumId,
+            albumName: String(matchedSong?.al?.name || '未知专辑'),
+            albumPicUrl: String(matchedSong?.al?.picUrl || ''),
+            publishTime,
+            date,
+            songLink: `https://music.163.com/#/song?id=${Number(matchedSong.id) || 0}`,
+            albumLink: `https://music.163.com/#/album?id=${albumId}`
+          });
+        }
+      }
+      return candidates;
+    }
+
+    async function runPool(items, limit, worker) {
+      const results = [];
+      let index = 0;
+      const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (index < items.length && !stopRequested) {
+          const current = items[index++];
+          const output = await worker(current);
+          results.push(output);
+        }
+      });
+      await Promise.all(runners);
+      return results;
+    }
+
+    function exportCsv() {
+      if (!currentResults.length) return;
+      const rows = [
+        ['艺人', '单曲名', '合辑/专辑名', '发行日期', '单曲链接', '专辑链接'],
+        ...currentResults.map(item => [
+          item.artistName,
+          item.songName,
+          item.albumName,
+          item.date,
+          item.songLink,
+          item.albumLink
+        ])
+      ];
+      const csv = '\ufeff' + rows.map(row => row.map(cell => {
+        const text = String(cell == null ? '' : cell).replace(/"/g, '""');
+        return /[",\n]/.test(text) ? `"${text}"` : text;
+      }).join(',')).join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `netease-va-sniffer-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function startScan() {
+      const saved = loadSettings();
+      const manualIds = normalizeArtistIds(els.manualArtists.value);
+      const cfg = {
+        apiBase: String(els.apiBase.value || '').trim(),
+        cookie: String(els.cookie.value || '').trim(),
+        useAggregate: Boolean(saved.useAggregate),
+        aggregateCookies: Array.isArray(saved.aggregateCookies) ? saved.aggregateCookies : [],
+        alwaysRefreshFollowed: Boolean(saved.alwaysRefreshFollowed),
+        skipRescanNextOnce: Boolean(saved.skipRescanNextOnce),
+        playlistSource: String(saved.playlistSource || '').trim(),
+        useCachedPlaylistArtists: Boolean(saved.useCachedPlaylistArtists),
+        onlyShowFollowedInFeed: Boolean(saved.onlyShowFollowedInFeed),
+        reuseArtistCache: Boolean(saved.reuseArtistCache),
+        smartScan: saved.smartScan !== false,
+        manualArtistIds: manualIds.length ? manualIds : (Array.isArray(saved.manualArtistIds) ? saved.manualArtistIds : [])
+      };
+      const rangeStart = dateOnlyMs(els.startDate.value, false);
+      const rangeEnd = dateOnlyMs(els.endDate.value, true);
+      const concurrency = Math.max(1, Math.min(12, Number(els.concurrency.value) || 4));
+      const songsLimit = Math.max(10, Math.min(100, Number(els.songsLimit.value) || 30));
+      if (!cfg.apiBase) {
+        alert('请先填写 API 基地址');
+        return;
+      }
+      if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd) || rangeStart > rangeEnd) {
+        alert('请设置有效的日期范围');
+        return;
+      }
+
+      resetForRun();
+      updateRangeChip();
+      updateModeChip();
+      setBusy(true);
+
+      try {
+        log('开始准备扫描配置...');
+        let artists = [];
+        let sourceLabel = '';
+        if (manualIds.length) {
+          log(`使用手动艺人 ID：${manualIds.join(', ')}`, 'warn');
+        } else {
+          log('按增强页 resolveArtistIds 逻辑准备艺人来源...', 'warn');
+        }
+        const resolved = await resolveArtistsForSniffer(cfg);
+        artists = resolved.artists;
+        sourceLabel = resolved.sourceLabel;
+        log(`本次扫描来源：${sourceLabel}，共 ${artists.length} 位艺人`, 'ok');
+        if (!artists.length) {
+          throw new Error('没有可扫描的艺人');
+        }
+
+        scheduleUiFlush({
+          done: 0,
+          total: artists.length,
+          hits: 0,
+          albumCount: 0,
+          statusText: `准备扫描 ${artists.length} 位艺人...`,
+          renderItems: currentResults
+        });
+        const task = await startBackendScan({
+          cfg: {
+            apiBase: cfg.apiBase,
+            cookie: cfg.cookie
+          },
+          artists,
+          rangeStart,
+          rangeEnd,
+          songsLimit,
+          concurrency
+        });
+        await waitForBackendCompletion(task?.id);
+      } catch (err) {
+        const msg = errorToMessage(err);
+        log(`扫描中断：${msg}`, 'err');
+        updateProgress(0, 1, `扫描失败：${msg}`);
+      } finally {
+        finishRun();
+      }
+    }
+
+    els.fillFromSettings.addEventListener('click', () => {
+      fillFromSavedSettings();
+      updateModeChip();
+      log('已从增强页本地设置读取 apiBase / Cookie。', 'ok');
+    });
+    els.startDate.addEventListener('change', updateRangeChip);
+    els.endDate.addEventListener('change', updateRangeChip);
+    els.manualArtists.addEventListener('input', updateModeChip);
+    els.startBtn.addEventListener('click', () => {
+      startScan().catch(err => log(`启动失败：${err?.message || err}`, 'err'));
+    });
+    els.stopBtn.addEventListener('click', () => {
+      stopRequested = true;
+      els.status.textContent = '正在停止扫描...';
+      stopBackendScan().catch(err => log(`停止请求失败：${errorToMessage(err)}`, 'warn'));
+    });
+    els.exportBtn.addEventListener('click', exportCsv);
+    els.results.addEventListener('toggle', (event) => {
+      const details = event.target;
+      if (!(details instanceof HTMLDetailsElement)) return;
+      const key = String(details.getAttribute('data-album-key') || '').trim();
+      if (!key) return;
+      if (details.open) openAlbumCards.add(key);
+      else openAlbumCards.delete(key);
+    }, true);
+
+    fillFromSavedSettings();
+    defaultDateRange();
+    updateModeChip();
+    log('已读取增强页的 apiBase / Cookie；当前页默认不自动带入手动艺人 ID，避免和关注艺人模式混淆。', 'ok');
+  </script>
+</body>
+</html>

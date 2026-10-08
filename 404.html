@@ -1,0 +1,32 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>正在加载...</title>
+  <script>
+    (function () {
+      // 把用户访问的原始 URL 存下，方便 index.html 恢复路由
+      var raw = window.location.pathname + window.location.search + window.location.hash;
+      try { sessionStorage.setItem('ghpages-redirect', raw); } catch (e) {}
+      // 猜测 repo 前缀
+      var parts = window.location.pathname.split('/').filter(Boolean);
+      var hostParts = window.location.hostname.split('.');
+      var isGhPagesIo = hostParts.length >= 3 && hostParts.slice(-2).join('.') === 'github.io';
+      var root = window.location.origin + '/';
+      if (isGhPagesIo && parts.length >= 1) {
+        // <user>.github.io/<repo>/xxx  → 回到 /<repo>/
+        var first = parts[0];
+        var userPart = (hostParts[0] || '').toLowerCase();
+        var userHomeName = userPart + '.github.io';
+        if (first.toLowerCase() !== userHomeName.toLowerCase()) {
+          // 项目仓库：第一段就是 repo 名
+          root = window.location.origin + '/' + first + '/';
+        }
+      }
+      // 用 replace 不增加 history
+      window.location.replace(root);
+    })();
+  </script>
+</head>
+<body></body>
+</html>

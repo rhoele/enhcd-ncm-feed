@@ -1,0 +1,680 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>独立 Spotify 测试 (Old ID)</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+        .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 5px; background: #f9f9f9; }
+        button { padding: 8px 16px; cursor: pointer; background: #1DB954; color: white; border: none; border-radius: 4px; font-size: 14px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #log { white-space: pre-wrap; background: #eee; padding: 10px; border: 1px solid #ddd; max-height: 400px; overflow-y: auto; font-family: monospace; }
+        h2 { margin-top: 0; }
+        .warn { color: #d32f2f; font-weight: bold; }
+        
+        /* Grid & Card Styles (Netease Style) */
+        .feed {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 16px;
+            align-items: stretch;
+        }
+
+        .card {
+            background: #181818;
+            border: 1px solid #282828;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            color: #fff;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            border-color: #3e3e3e;
+            background: #282828;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            z-index: 1;
+        }
+
+        .spotify-card-netease {
+            font-family: 'Spotify Mix', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        .spotify-card-netease .cover {
+            width: 100%;
+            aspect-ratio: 1;
+            overflow: hidden;
+            position: relative;
+            background: #121212;
+        }
+
+        .spotify-card-netease .cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .spotify-card-netease .meta {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .spotify-card-netease .title {
+            font-size: 16px;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .spotify-card-netease .artist {
+            font-size: 14px;
+            color: #b3b3b3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .spotify-card-netease .date {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .spotify-card-netease .label {
+            background: rgba(29, 185, 84, 0.1);
+            color: #1db954;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 12px;
+            display: inline-block;
+            align-self: flex-start;
+        }
+
+        .spotify-card-netease .links {
+            margin-top: auto;
+            padding-top: 12px;
+        }
+
+        .spotify-card-netease .pill {
+            background: #1db954;
+            color: #fff;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 99px;
+            font-size: 13px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+
+        .spotify-card-netease .pill:hover {
+            background: #1ed760;
+        }
+    </style>
+</head>
+<body>
+    <h1>Spotify 独立测试工具 (Old ID)</h1>
+    <p class="warn">此工具完全独立运行，不会修改主程序的任何配置。</p>
+
+    <div class="box">
+        <h2>1. 认证设置</h2>
+        <div style="margin-bottom: 15px;">
+            <label><input type="radio" name="authMode" value="pkce" checked onclick="toggleAuthMode()"> 个人账号登录 (PKCE)</label>
+            <label style="margin-left: 20px;"><input type="radio" name="authMode" value="client" onclick="toggleAuthMode()"> 应用凭证 (Client Credentials)</label>
+        </div>
+
+        <div id="authConfig">
+            <div style="margin-bottom: 10px;">
+                <label>Client ID:</label><br>
+                <input type="text" id="clientId" value="668aaab2a5ac4085aae1146e29c19193" style="width: 100%; padding: 5px;">
+            </div>
+            <div id="clientSecretBox" style="margin-bottom: 10px; display: none;">
+                <label>Client Secret (仅用于 Client Credentials 模式):</label><br>
+                <input type="password" id="clientSecret" value="ca8df2ff33e34954b9f8782c8257624d" style="width: 100%; padding: 5px;">
+                <p style="font-size: 0.8em; color: #666;">建议创建一个新的 Spotify App 以获取全新的 ID 和 Secret，可彻底解决限流问题。</p>
+            </div>
+        </div>
+
+        <div style="margin-top: 10px;">
+            <button id="btnLogin" onclick="handleLogin()">Login / Get Token</button>
+            <button onclick="clearToken()" style="background: #666; margin-left: 10px;">清除 Token</button>
+        </div>
+        <div id="tokenStatus" style="margin-top: 10px; color: #666;">未获取 Token</div>
+    </div>
+
+    <div class="box">
+        <h2>2. 批量搜索配置</h2>
+        <div style="margin-bottom: 10px;">
+            <label>目标日期: <input type="date" id="targetDate"></label>
+            <label>范围 (天): <input type="number" id="daysRange" value="1" min="1" style="width: 50px;"></label>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <label>厂牌列表 (每行一个):</label><br>
+            <textarea id="labelList" rows="10" style="width: 100%; font-family: monospace;"></textarea>
+        </div>
+        <button id="btnBatchSearch" onclick="startBatchSearch()" disabled>开始批量搜索</button>
+        <button id="btnStop" onclick="stopSearch()" disabled style="background: #d32f2f;">停止</button>
+        <button id="btnExport" onclick="exportResults()" disabled style="background: #007bff; margin-left: 10px;">导出 CSV</button>
+        <div id="progress" style="margin-top: 10px; font-weight: bold;"></div>
+    </div>
+
+    <div id="results" class="box">
+        <h2>搜索结果</h2>
+        <div id="resultsContent"></div>
+    </div>
+
+    <div id="log">等待操作...</div>
+
+    <script>
+        // 必须在 Spotify Dashboard 添加此 URL
+        const REDIRECT_URI = 'http://127.0.0.1:8001/test-new-id.html'; 
+        
+        let accessToken = null;
+        let isSearching = false;
+
+        // Default Labels
+        const DEFAULT_LABELS = [
+            // Melodic
+            'Ufality','Stardust','Sizeland','ARWV','Arctic Empire','Paradise Music','Future Bass Records','Ophelia Records','Heaven Sent','SQUAD Nation','Nightblue Music','Spiration','Spiration Music','Recursive Recordings','Jupita','Noiseporn','Outertone','Bass Boost','Melodic Bassment Records','Bass Rebels Records','Starling EDM','MNTN Records','FeelQ Recordings','Legion Records','Frostfyre Records','Scan Records','FreeMusicWave','INVIBES Recordings','Protocol Recordings','Exuvium Records','Jade City Records','Atelier Records','Flight Zone Records','Euphonix Recordings','Simplify Recordings',
+            // Bass
+            'Neoluminum','Reinelex Records','The Half Heart Project','Unbeyond Anthologies','Tonality','Oblivion Audio','Interval Audio','Full Flex Audio','Flexout Audio','Shuttle Recs','Frozen Fox Records','Mithril Records','Gravitas Recordings','Odyzey Music','HQThree Records','Kannibalen Records','Quality Goods Records','MorFlo Records','MONTA','NIGHTMODE','BREAK ROOM','broke','Sable Valley Records','DirtySnatcha Records','Basscapital Recs','A Records','High Caliber Records','Bad Medic Records','Cyclops Recordings','Sounds Of Mayhem','Subsidia','Bass Darkness','Antithesys Records','PRIMAL RECORDS','Seikatsu Records','Let Them Cook Records','Deadbeats','Bassrush','Bite This!','Beat Intelligence Network','Gud Vibrations','Trippy Bee Records',
+            // DnB
+            'UKF','Pilot.','High Tea Music','Liquicity','DNBB Records','Hospital Records','Viper Recordings','Paperfunk Recordings','Delta9 Recordings','Automata Music','DnB Allstars Records','Symmetry Recordings','GLITCH.','RIOT RECORDS','Play Me Records','play:music','DnB Doctor.','Shogun Audio','Critical Music','Galacy Records','Souped Up Records','Neksus Sound','Gunsta Records','Delta9 Records','Soulvent Records','MODUS','Wobbles & Waffles',
+            // Others
+            'Monstercat','NCS','Seeking Blue Records','Lost In Dreams Records','bitbird','AVA Recordings','Circus Records','Seeking Blue Records','Thrive Music','This Never Happened','Enhanced','Anjunadeep','Anjunabeats','mau5trap','Armada','Meanwhile Recordings','Intensity Recordings','Edm Mania Recordings','Umpire Records','Solvana Records','frequency fifty six','Dim Mak','The MasterBeat Project','The MasterBeat Horizon','Blackout Music NL','Emotions Control Music','Overview Music','IN / ROTATION','Insomniac Records','FSOE','Confession','Black hole Recordings','Interstellar','Future Classic','Hypersia Records',
+            'UXN','Port Zero','More Bass More Good','Asahi Crew','Lunar Bass Records','MOTTO MUSIC','Ridmic','4 Jungle Records','Motive Hunter Audio','YANA Music','FRAKTVRED','Elephant Trunk','Salia Sounds','Kingdom Audio',
+            'West Cove Recordings','High Resistance','Serenadé Music','Sky Bass Records','LVLD Music','Mugic.us Records','Jadu Dala','DEEPNAS','Eons Away Label',
+            'HellCat Media','Light New Fires','Manifest','Futurized Records','IX Recorders','The QR Network','Drama Club Recordings'
+        ];
+
+        function log(msg) {
+            const el = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            el.textContent = `[${time}] ${msg}\n` + el.textContent;
+        }
+
+        async function readErrorBody(res) {
+            try {
+                const txt = await res.text();
+                try {
+                    const json = JSON.parse(txt);
+                    if (json && typeof json === 'object') {
+                        return json.message || json.error_description || json.error?.message || json.error || txt;
+                    }
+                } catch (_) {}
+                return txt;
+            } catch (_) {
+                return '';
+            }
+        }
+
+        async function throwSpotifyForbidden(res, phase) {
+            const details = await readErrorBody(res);
+            const msg = `403 Forbidden (${phase})：当前账号、App ID 或出口 IP 被 Spotify 拦截。${details ? ` 详情：${details}` : ''}`;
+            isSearching = false;
+            document.getElementById('btnStop').disabled = true;
+            document.getElementById('btnBatchSearch').disabled = false;
+            document.getElementById('progress').textContent = '搜索已因 403 被中止';
+            log(`🛑 ${msg}`);
+            throw new Error(msg);
+        }
+
+        // Init
+        window.addEventListener('load', () => {
+            document.getElementById('targetDate').valueAsDate = new Date();
+            document.getElementById('labelList').value = DEFAULT_LABELS.join('\n');
+            
+            // Check stored inputs
+            if(localStorage.getItem('sp_client_id')) document.getElementById('clientId').value = localStorage.getItem('sp_client_id');
+            if(localStorage.getItem('sp_client_secret')) document.getElementById('clientSecret').value = localStorage.getItem('sp_client_secret');
+        });
+
+        function toggleAuthMode() {
+            const mode = document.querySelector('input[name="authMode"]:checked').value;
+            const secretBox = document.getElementById('clientSecretBox');
+            if (mode === 'client') {
+                secretBox.style.display = 'block';
+            } else {
+                secretBox.style.display = 'none';
+            }
+        }
+        
+        function clearToken() {
+            accessToken = null;
+            document.getElementById('tokenStatus').textContent = '未获取 Token';
+            document.getElementById('tokenStatus').style.color = '#666';
+            document.getElementById('btnLogin').style.display = 'inline-block';
+            document.getElementById('btnBatchSearch').disabled = true;
+            log('Token 已清除。');
+        }
+
+        function handleLogin() {
+            const mode = document.querySelector('input[name="authMode"]:checked').value;
+            const clientId = document.getElementById('clientId').value.replace(/[^a-zA-Z0-9]/g, '');
+            
+            if (!clientId) return alert('请输入 Client ID');
+            localStorage.setItem('sp_client_id', clientId);
+
+            if (mode === 'pkce') {
+                loginPKCE(clientId);
+            } else {
+                const secret = document.getElementById('clientSecret').value.replace(/[^a-zA-Z0-9]/g, '');
+                if (!secret) return alert('请输入 Client Secret');
+                localStorage.setItem('sp_client_secret', secret);
+                loginClientCredentials(clientId, secret);
+            }
+        }
+
+        // 1. PKCE Login Logic
+        function loginPKCE(clientId) {
+            // Generate PKCE Verifier
+            const verifier = generateRandomString(128);
+            generateCodeChallenge(verifier).then(challenge => {
+                // Save verifier to sessionStorage (isolated from localStorage)
+                sessionStorage.setItem('spotify_verifier_test', verifier);
+                sessionStorage.setItem('spotify_test_mode', 'true'); // Flag to intercept
+                // Save Client ID for callback
+                sessionStorage.setItem('spotify_client_id_temp', clientId);
+
+                const scope = 'user-read-private user-read-email';
+                const args = new URLSearchParams({
+                    response_type: 'code',
+                    client_id: clientId,
+                    scope: scope,
+                    redirect_uri: REDIRECT_URI,
+                    code_challenge_method: 'S256',
+                    code_challenge: challenge
+                });
+
+                window.location.href = 'https://accounts.spotify.com/authorize?' + args.toString();
+            });
+        }
+        
+        async function loginClientCredentials(id, secret) {
+             log('正在通过 Client Credentials 获取 Token...');
+             try {
+                 const creds = btoa(`${id}:${secret}`);
+                 const res = await fetch('http://127.0.0.1:8012/spotify-token', { // Use proxy
+                     method: 'POST',
+                     headers: {
+                         'Authorization': `Basic ${creds}`,
+                         'Content-Type': 'application/x-www-form-urlencoded'
+                     },
+                     body: 'grant_type=client_credentials'
+                 });
+                 
+                 if (!res.ok) {
+                     const txt = await res.text();
+                     throw new Error(`HTTP ${res.status}: ${txt}`);
+                 }
+                 
+                 const data = await res.json();
+                 if (data.access_token) {
+                    accessToken = data.access_token;
+                    document.getElementById('tokenStatus').textContent = '✅ App Token 获取成功!';
+                    document.getElementById('tokenStatus').style.color = 'blue';
+                    document.getElementById('btnLogin').style.display = 'none';
+                    document.getElementById('btnBatchSearch').disabled = false;
+                    log('App Token 获取成功! (Client Credentials 模式)');
+                 } else {
+                     throw new Error('No access_token in response');
+                 }
+             } catch (e) {
+                 log(`❌ Client Credentials 登录失败: ${e.message}`);
+                 alert('登录失败，请检查 Client ID 和 Secret 是否正确，或者该 App 是否被封禁。');
+             }
+        }
+
+        // PKCE Helpers
+        function generateRandomString(length) {
+            let text = '';
+            const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+            for (let i = 0; i < length; i++) {
+                text += possible.charAt(Math.floor(Math.random() * possible.length));
+            }
+            return text;
+        }
+
+        async function generateCodeChallenge(codeVerifier) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(codeVerifier);
+            const digest = await window.crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(digest)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        // 2. Handle Callback (Check on Load)
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        const error = params.get('error');
+
+        // Check if we are in "Test Mode" callback
+        if (sessionStorage.getItem('spotify_test_mode') === 'true' && code) {
+            // We are back!
+            log('收到授权码，正在交换 Token...');
+            const verifier = sessionStorage.getItem('spotify_verifier_test');
+            const clientId = sessionStorage.getItem('spotify_client_id_temp') || document.getElementById('clientId').value;
+            
+            fetchTokenPKCE(code, verifier, clientId).then(tokenData => {
+                if (tokenData.access_token) {
+                    accessToken = tokenData.access_token;
+                    document.getElementById('tokenStatus').textContent = '✅ Token 获取成功!';
+                    document.getElementById('tokenStatus').style.color = 'green';
+                    document.getElementById('btnLogin').style.display = 'none';
+                    document.getElementById('btnBatchSearch').disabled = false;
+                    
+                    log('Token 获取成功! 现在可以点击搜索按钮。');
+                    
+                    // Clean URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            }).catch(e => {
+                log('Token 交换失败: ' + e.message);
+            });
+            
+            sessionStorage.removeItem('spotify_test_mode');
+            sessionStorage.removeItem('spotify_client_id_temp');
+        } else if (error) {
+            log('授权错误: ' + error);
+        }
+
+        async function fetchTokenPKCE(code, verifier, clientId) {
+            const body = new URLSearchParams({
+                client_id: clientId,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: REDIRECT_URI,
+                code_verifier: verifier
+            });
+
+            try {
+                const res = await fetch('https://accounts.spotify.com/api/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body
+                });
+                
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(`HTTP ${res.status}: ${txt}`);
+                }
+                return await res.json();
+            } catch (e) {
+                log('Direct token fetch failed: ' + e.message);
+                throw e;
+            }
+        }
+
+        // 3. Search Logic
+        function stopSearch() {
+            isSearching = false;
+            document.getElementById('btnStop').disabled = true;
+            document.getElementById('btnBatchSearch').disabled = false;
+            log('已停止搜索。');
+        }
+
+        let globalResults = [];
+
+        async function startBatchSearch() {
+            if (!accessToken) return alert('No Token');
+            const labels = document.getElementById('labelList').value.split('\n').map(s => s.trim()).filter(s => s);
+            if (!labels.length) return alert('No labels');
+            
+            const targetDateStr = document.getElementById('targetDate').value;
+            if (!targetDateStr) return alert('Please select a date');
+            const daysRange = parseInt(document.getElementById('daysRange').value || '1');
+            
+            // Calculate Date Range
+            const targetDateObj = new Date(targetDateStr);
+            const validDates = new Set();
+            for (let i = -1; i < daysRange; i++) { // Include T+1 for timezone, strictly respect daysRange
+                const d = new Date(targetDateObj);
+                d.setDate(d.getDate() - i);
+                validDates.add(d.toISOString().split('T')[0]);
+            }
+            
+            const year = targetDateObj.getFullYear();
+            const prevYearObj = new Date(targetDateObj);
+            prevYearObj.setDate(prevYearObj.getDate() - (daysRange + 1));
+            const yearQ = (prevYearObj.getFullYear() !== year) ? ` year:${prevYearObj.getFullYear()}-${year}` : ` year:${year}`;
+            
+            isSearching = true;
+            document.getElementById('btnBatchSearch').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+            document.getElementById('btnExport').disabled = true;
+            document.getElementById('resultsContent').innerHTML = '';
+            globalResults = []; // Reset
+            
+            log(`开始批量搜索 ${labels.length} 个厂牌... 目标日期: ${targetDateStr} (范围: ${Array.from(validDates).join(', ')})`);
+            
+            let foundCount = 0;
+            
+            for (let i = 0; i < labels.length; i++) {
+                if (!isSearching) break;
+                const label = labels[i];
+                document.getElementById('progress').textContent = `正在搜索 (${i + 1}/${labels.length}): ${label}`;
+                
+                try {
+                    const results = await searchLabel(label, yearQ, validDates);
+                    if (results && results.length > 0) {
+                        foundCount += results.length;
+                        results.forEach(item => {
+                             item._queryLabel = label; // Attach metadata
+                             globalResults.push(item);
+                             appendResult(item, label);
+                        });
+                        log(`✅ [${label}] 发现 ${results.length} 个新专辑`);
+                    } else {
+                        // log(`[${label}] 无结果`);
+                    }
+                } catch (e) {
+                    log(`❌ [${label}] 错误: ${e.message}`);
+                }
+                
+                // Rate limit buffer / Politeness
+                // If we recently hit 429, slow down the main loop too
+                const baseDelay = 2000;
+                await new Promise(r => setTimeout(r, baseDelay));
+            }
+            
+            document.getElementById('progress').textContent = isSearching ? `搜索完成! 共发现 ${foundCount} 个专辑。` : '搜索已停止。';
+            document.getElementById('btnBatchSearch').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+            if (globalResults.length > 0) document.getElementById('btnExport').disabled = false;
+            isSearching = false;
+        }
+
+        function exportResults() {
+            if (globalResults.length === 0) return alert('没有结果可导出');
+            
+            let csv = 'Album Name,Artists,Release Date,Label,Spotify URL,Query Label\n';
+            globalResults.forEach(item => {
+                const artists = item.artists.map(a => a.name).join('; ');
+                const row = [
+                    `"${item.name.replace(/"/g, '""')}"`,
+                    `"${artists.replace(/"/g, '""')}"`,
+                    item.release_date,
+                    `"${(item.label || '').replace(/"/g, '""')}"`,
+                    item.external_urls.spotify,
+                    `"${item._queryLabel}"`
+                ];
+                csv += row.join(',') + '\n';
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `spotify_search_results_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function searchLabel(label, yearQ, validDates, attempt = 0) {
+            const isRawQuery = /\b(label|year|tag|upc|isrc|genre|artist|album|track):/i.test(label);
+            let qVal;
+            if(isRawQuery) {
+                qVal = /year:/i.test(label) ? label : `${label}${yearQ}`;
+            } else {
+                qVal = `label:"${label}"${yearQ}`;
+            }
+            
+            const keyLower = label.toLowerCase();
+            const matchedItemsMap = new Map();
+            
+            // 1. Pagination: fetch up to 5 pages (50 items)
+            for(let offset = 0; offset < 50; offset += 10) {
+                if (!isSearching) break;
+                const url = new URL('http://127.0.0.1:8012/spotify-api/search');
+                url.searchParams.set('q', qVal);
+                url.searchParams.set('type', 'album');
+                url.searchParams.set('limit', '10');
+                url.searchParams.set('offset', offset.toString());
+                url.searchParams.set('market', 'US');
+
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    
+                    if (res.status === 429) {
+                        const retryAfter = parseInt(res.headers.get('Retry-After') || '10', 10);
+                        const backoff = (retryAfter * 1000) + (Math.pow(2, attempt) * 2000);
+                        const waitMs = Math.min(backoff, 120000);
+                        log(`⚠️ 429 Rate Limit! 账号被限流，等待 ${Math.ceil(waitMs/1000)}s...`);
+                        await new Promise(r => setTimeout(r, waitMs));
+                        // Decrement offset to retry this page
+                        offset -= 10;
+                        attempt++;
+                        continue; 
+                    }
+
+                    if (res.status === 403) {
+                        await throwSpotifyForbidden(res, `search ${label}`);
+                    }
+                    
+                    if (!res.ok) {
+                        const txt = await res.text();
+                        throw new Error(`${res.status} ${res.statusText}: ${txt.substring(0, 100)}`);
+                    }
+                    
+                    const data = await res.json();
+                    const items = data.albums ? data.albums.items : [];
+                    
+                    if (items.length === 0) break;
+                    
+                    const skipDateFilter = /\b(year|tag:new):/i.test(label);
+                    
+                    for(const item of items) {
+                        if (!skipDateFilter && item.release_date_precision !== 'day') continue;
+                        if (skipDateFilter || validDates.has(item.release_date)) {
+                            matchedItemsMap.set(item.id, item);
+                        }
+                    }
+                    
+                    if (items.length < 10) break; // no more pages
+                    await new Promise(r => setTimeout(r, 800));
+                } catch (e) {
+                    console.error(e);
+                    throw e;
+                }
+            }
+            
+            const candidateItems = Array.from(matchedItemsMap.values());
+            if (candidateItems.length === 0) return [];
+
+            // 2. Fetch Full Album Details in batches of 20 to get 'label' field
+            const detailedAlbums = [];
+            for (let i = 0; i < candidateItems.length; i += 20) {
+                if (!isSearching) break;
+                const chunk = candidateItems.slice(i, i + 20);
+                const ids = chunk.map(x => x.id).join(',');
+                const dUrl = `http://127.0.0.1:8012/spotify-api/albums?ids=${ids}&market=US`;
+                
+                try {
+                    const res2 = await fetch(dUrl, {
+                         headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    
+                    if (res2.status === 429) {
+                        const retryAfter = parseInt(res2.headers.get('Retry-After') || '5', 10);
+                        await new Promise(r => setTimeout(r, (retryAfter * 1000) + 2000));
+                        i -= 20; // retry chunk
+                        continue;
+                    }
+
+                    if (res2.status === 403) {
+                        await throwSpotifyForbidden(res2, `albums ${label}`);
+                    }
+                    
+                    if (res2.ok) {
+                        const data2 = await res2.json();
+                        for (const d of (data2.albums || [])) {
+                            if (!d) continue;
+                            const dLabel = String(d.label || '').toLowerCase();
+                            // Strict Label Check: Bidirectional includes
+                            if (!isRawQuery && !dLabel.includes(keyLower) && !keyLower.includes(dLabel)) {
+                                continue;
+                            }
+                            detailedAlbums.push(d);
+                        }
+                    }
+                } catch(e) {
+                    console.error(`Failed to fetch album details`, e);
+                }
+                await new Promise(r => setTimeout(r, 800));
+            }
+
+            return detailedAlbums;
+        }
+        
+        function appendResult(item, queryLabel) {
+            const container = document.getElementById('resultsContent');
+            if (!container.classList.contains('feed')) {
+                container.classList.add('feed');
+                container.style.border = 'none'; // remove old style if any
+            }
+            
+            const div = document.createElement('article');
+            div.className = 'card spotify-card-netease';
+            
+            // Debug missing label
+            if (!item.label) {
+                console.warn('Album missing label:', item);
+            }
+            const labelDisplay = item.label || queryLabel || 'Label Hidden';
+            const artists = item.artists.map(a => a.name).join(', ');
+            const imgUrl = item.images && item.images[0] ? item.images[0].url : '';
+
+            div.innerHTML = `
+              <div class="cover">
+                ${imgUrl ? `<img src="${imgUrl}" alt="${item.name}" loading="lazy" />` : ''}
+              </div>
+              <div class="meta">
+                <div class="title" title="${item.name}">${item.name}</div>
+                <div class="artist" title="${artists}">${artists}</div>
+                <div class="date">发布日期：${item.release_date}</div>
+                <div class="label">厂牌：${labelDisplay}</div>
+                <div class="links" style="margin-top: 12px;">
+                  <a class="pill" href="${item.external_urls.spotify}" target="_blank" rel="noopener">打开 Spotify</a>
+                </div>
+              </div>
+            `;
+            container.appendChild(div);
+        }
+    </script>
+</body>
+</html>

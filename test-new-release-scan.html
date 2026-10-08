@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>网易云新作后端扫描测试页</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: rgba(20, 25, 40, 0.82);
+      --line: rgba(132, 146, 196, 0.18);
+      --line-strong: rgba(129, 140, 248, 0.32);
+      --text: #eef2ff;
+      --muted: #9aa4c7;
+      --accent: #7c8cff;
+      --accent-2: #57d3ff;
+      --ok: #7ee7a8;
+      --warn: #ffd479;
+      --err: #ff8e8e;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(87, 211, 255, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(124, 140, 255, 0.18), transparent 32%),
+        linear-gradient(180deg, #080c18 0%, #0b1020 100%);
+      min-height: 100vh;
+    }
+    a { color: inherit; }
+    .page {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 22px;
+    }
+    .hero h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.2;
+    }
+    .hero p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      max-width: 900px;
+      line-height: 1.65;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 420px minmax(0, 1fr);
+      gap: 22px;
+    }
+    .panel-body {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .section-title {
+      margin: 0 0 16px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .field { margin-bottom: 14px; }
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    input, textarea {
+      width: 100%;
+      border: 1px solid rgba(140, 155, 206, 0.2);
+      background: rgba(7, 10, 20, 0.78);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      outline: none;
+      transition: 0.2s ease;
+    }
+    input:focus, textarea:focus {
+      border-color: var(--line-strong);
+      box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.12);
+    }
+    textarea {
+      min-height: 106px;
+      resize: vertical;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .checkbox {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 6px;
+      color: var(--text);
+    }
+    .checkbox input {
+      width: auto;
+      margin: 0;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    button {
+      border: 1px solid rgba(140, 155, 206, 0.2);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 11px 18px;
+      font: inherit;
+      cursor: pointer;
+      transition: 0.2s ease;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      border-color: rgba(129, 140, 248, 0.5);
+      background: rgba(255, 255, 255, 0.1);
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .primary {
+      background: linear-gradient(135deg, rgba(124, 140, 255, 0.92), rgba(87, 211, 255, 0.92));
+      color: #06111f;
+      border-color: transparent;
+      font-weight: 700;
+      box-shadow: 0 10px 30px rgba(87, 211, 255, 0.2);
+    }
+    .danger {
+      color: #ffd6d6;
+      border-color: rgba(255, 142, 142, 0.22);
+      background: rgba(255, 142, 142, 0.09);
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .stat {
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    }
+    .stat .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .stat .value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .progress-wrap { margin: 16px 0 12px; }
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      box-shadow: 0 0 24px rgba(87, 211, 255, 0.35);
+      transition: width 0.2s ease;
+    }
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+      min-height: 20px;
+    }
+    .results-toolbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .feed {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .card {
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025));
+      box-shadow: 0 14px 36px rgba(0,0,0,0.22);
+      display: grid;
+      gap: 10px;
+    }
+    .cover {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+    }
+    .cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .badge {
+      display: inline-flex;
+      width: fit-content;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: rgba(126, 231, 168, 0.12);
+      color: var(--ok);
+      border: 1px solid rgba(126, 231, 168, 0.18);
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.4;
+      color: var(--text);
+      min-height: 44px;
+    }
+    .artist {
+      color: #c9d2ff;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: auto;
+    }
+    .links a {
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.07);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .empty {
+      border: 1px dashed rgba(140, 155, 206, 0.25);
+      border-radius: 18px;
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+    }
+    .log {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: rgba(6, 10, 18, 0.7);
+      font: 12px/1.6 Consolas, Monaco, monospace;
+      white-space: pre-wrap;
+      min-height: 260px;
+      flex: 1 1 auto;
+      overflow: auto;
+    }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .err { color: var(--err); }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .feed { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .feed { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      .page { padding: 18px; }
+      .hero { flex-direction: column; }
+      .stats, .row { grid-template-columns: 1fr; }
+      .feed { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div>
+        <h1>网易云新作后端扫描测试页</h1>
+        <p>这个页面只跑“自有新作”后端扫描，故意不掺增强页标签切换、合辑补扫和 Spotify 逻辑。目标是先把新作扫描速度调到与合辑测试页同量级，再决定是否回搬到增强页，必要时也可以直接把这里当正式页。</p>
+      </div>
+      <div class="hero-actions">
+        <a href="index-enhanced.html"><button type="button">返回增强页</button></a>
+        <a href="test-va-sniffer.html"><button type="button">打开合辑测试页</button></a>
+        <button id="fillFromSettings" type="button">读取当前设置</button>
+      </div>
+    </section>
+
+    <div class="layout">
+      <section class="panel">
+        <div class="panel-body">
+          <h2 class="section-title">扫描配置</h2>
+          <div class="field">
+            <label for="scanBackendBase">后端扫描与缓存接口 (start-static.js)</label>
+            <input id="scanBackendBase" placeholder="本地部署：http://127.0.0.1:8001；Pages 必填" />
+            <small class="hint">新作扫描 start/status/stop 接口和 owned 艺人缓存都走这个地址。</small>
+          </div>
+          <div class="field">
+            <label for="apiBase">网易云 API 基地址</label>
+            <input id="apiBase" placeholder="例如：http://127.0.0.1:3000（CORS 代理对接 ncm-api-lite）" />
+          </div>
+          <div class="field">
+            <label for="cookie">网易云 Cookie</label>
+            <textarea id="cookie" placeholder="默认尝试读取增强页已保存的 Cookie；如为空则走浏览器凭据。"></textarea>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="startDate">起始日期</label>
+              <input id="startDate" type="date" />
+            </div>
+            <div class="field">
+              <label for="endDate">结束日期</label>
+              <input id="endDate" type="date" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="concurrency">并发数</label>
+              <input id="concurrency" type="number" min="1" max="16" value="10" />
+            </div>
+            <div class="field">
+              <label for="manualArtists">手动艺人 ID 列表</label>
+              <textarea id="manualArtists" placeholder="默认留空。仅在你明确要做局部验证时再填；一旦填写，这里会优先进入手动模式。"></textarea>
+            </div>
+          </div>
+          <div class="hint" id="manualModeHint">当前未启用手动艺人模式，将优先使用本地 9000+ 艺人大缓存或关注来源。</div>
+          <label class="checkbox">
+            <input id="smartScan" type="checkbox" checked />
+            <span>启用智能增量跳过（复用艺人检查缓存）</span>
+          </label>
+          <label class="checkbox">
+            <input id="preferOwnedCache" type="checkbox" checked />
+            <span>优先使用本地 9000+ 艺人大缓存</span>
+          </label>
+          <div class="actions">
+            <button id="startBtn" class="primary" type="button">开始扫描</button>
+            <button id="stopBtn" class="danger" type="button" disabled>停止</button>
+            <button id="exportBtn" type="button" disabled>导出 CSV</button>
+          </div>
+          <div class="log" id="log">等待开始扫描…</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-body">
+          <div class="stats">
+            <div class="stat">
+              <div class="label">扫描艺人数</div>
+              <div class="value" id="statArtists">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">命中新作专辑</div>
+              <div class="value" id="statHits">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">结果专辑数</div>
+              <div class="value" id="statAlbums">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">Owned 缓存艺人数</div>
+              <div class="value" id="statOwned">0</div>
+            </div>
+            <div class="stat">
+              <div class="label">耗时</div>
+              <div class="value" id="statElapsed">00:00</div>
+            </div>
+          </div>
+
+          <div class="results-toolbar">
+            <div class="chips">
+              <div class="chip" id="rangeChip">日期范围：未设置</div>
+              <div class="chip" id="modeChip">模式：关注艺人扫描</div>
+              <div class="chip" id="sourceChip">来源：未开始</div>
+            </div>
+            <div class="hint" id="summaryHint">结果会按发行日期倒序展示，仅包含自有新作。</div>
+          </div>
+
+          <div class="progress-wrap">
+            <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+          </div>
+          <div id="status" class="status">尚未开始。</div>
+
+          <div id="results" class="feed">
+            <div class="empty">点击左侧“开始扫描”以验证新作后端扫描速度。</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="seed-settings.js"></script>
+  <script>
+    // ===== Seed 默认值注入（同 index-enhanced 机制） =====
+    try {
+      (function __applySeed() {
+        if (!window.NAF_SEED_SETTINGS || typeof window.NAF_SEED_SETTINGS !== 'object') return;
+        const seed = window.NAF_SEED_SETTINGS;
+        const LS_KEY_FORCE = seed.__lsKey || 'netease-feed-settings-v1';
+        const currentRaw = localStorage.getItem(LS_KEY_FORCE);
+        let shouldApply = !currentRaw;
+        if (typeof seed.__seedVersion === 'number') {
+          try {
+            const curObj = currentRaw ? JSON.parse(currentRaw) : {};
+            if (seed.__seedVersion > (Number(curObj.__seedVersion) || 0)) shouldApply = true;
+          } catch {}
+        }
+        if (seed.__force === true) shouldApply = true;
+        if (!shouldApply) return;
+        const merged = Object.assign({}, seed);
+        delete merged.__lsKey; delete merged.__force;
+        const text = JSON.stringify(merged);
+        try { localStorage.setItem(LS_KEY_FORCE, text); } catch {}
+        try {
+          const encoded = encodeURIComponent(text).replace(/'/, "%27").replace(/\(/g, "%28").replace(/\)/g, "%29");
+          document.cookie = 'naf_settings_backup=' + encoded + '; path=/; max-age=15552000; samesite=lax';
+        } catch {}
+        if (seed.__followCache && typeof seed.__followCache === 'object') {
+          try { localStorage.setItem('netease-follow-cache-v1', JSON.stringify(seed.__followCache)); } catch {}
+        }
+        if (seed.__artistCheckCache && typeof seed.__artistCheckCache === 'object') {
+          try { localStorage.setItem('netease-artist-check-cache-v2', JSON.stringify(seed.__artistCheckCache)); } catch {}
+        }
+      })();
+    } catch {}
+
+    const LS_KEY = 'netease-feed-settings-v1';
+    const FOLLOW_CACHE_KEY = 'netease-follow-cache-v1';
+    const ARTIST_CHECK_CACHE_KEY = 'netease-artist-check-cache-v2';
+    const VA_OWNED_ARTIST_CACHE_ENDPOINT = '/api/va-owned-artist-cache';
+    const NEW_SCAN_START_ENDPOINT = '/api/new-release-scan/start';
+    const NEW_SCAN_STATUS_ENDPOINT = '/api/new-release-scan/status';
+    const NEW_SCAN_STOP_ENDPOINT = '/api/new-release-scan/stop';
+    const NEW_SCAN_CLEAR_ENDPOINT = '/api/new-release-scan/clear';
+
+    // ===== GitHub Pages 配置化：相对 /api/* -> 绝对 URL =====
+    function __trimBase(s) { const v = String(s || '').trim().replace(/\/+$/, ''); return v || ''; }
+    function __isLocalSameOrigin(portPattern) {
+      try {
+        const host = window.location.hostname || '';
+        if (!['127.0.0.1', 'localhost', ''].includes(host)) return false;
+        if (!portPattern) return true;
+        const p = window.location.port;
+        return !p || String(portPattern).split(',').includes(String(p));
+      } catch { return false; }
+    }
+    function getScanBackendBase() {
+      const saved = loadSettings();
+      const v = __trimBase(saved.scanBackendBase);
+      if (v) return v;
+      const inputEl = document.getElementById('scanBackendBase');
+      const vv = __trimBase(inputEl ? inputEl.value : '');
+      if (vv) return vv;
+      if (__isLocalSameOrigin('8001,8000,8002,8080')) return __trimBase(window.location.origin);
+      return '';
+    }
+    function resolveScanApi(rel) {
+      if (/^https?:/i.test(rel)) return rel;
+      const base = getScanBackendBase();
+      if (!base) return rel;
+      return base + (rel.startsWith('/') ? rel : '/' + rel);
+    }
+
+    const els = {
+      scanBackendBase: document.getElementById('scanBackendBase'),
+      apiBase: document.getElementById('apiBase'),
+      cookie: document.getElementById('cookie'),
+      startDate: document.getElementById('startDate'),
+      endDate: document.getElementById('endDate'),
+      concurrency: document.getElementById('concurrency'),
+      manualArtists: document.getElementById('manualArtists'),
+      smartScan: document.getElementById('smartScan'),
+      preferOwnedCache: document.getElementById('preferOwnedCache'),
+      fillFromSettings: document.getElementById('fillFromSettings'),
+      startBtn: document.getElementById('startBtn'),
+      stopBtn: document.getElementById('stopBtn'),
+      exportBtn: document.getElementById('exportBtn'),
+      status: document.getElementById('status'),
+      log: document.getElementById('log'),
+      progressFill: document.getElementById('progressFill'),
+      results: document.getElementById('results'),
+      statArtists: document.getElementById('statArtists'),
+      statHits: document.getElementById('statHits'),
+      statAlbums: document.getElementById('statAlbums'),
+      statOwned: document.getElementById('statOwned'),
+      statElapsed: document.getElementById('statElapsed'),
+      rangeChip: document.getElementById('rangeChip'),
+      modeChip: document.getElementById('modeChip'),
+      sourceChip: document.getElementById('sourceChip'),
+      summaryHint: document.getElementById('summaryHint')
+    };
+
+    let stopRequested = false;
+    let currentResults = [];
+    let currentSourceLabel = '未开始';
+    let scanStartedAt = 0;
+    let elapsedTimer = null;
+    let backendTaskId = '';
+    let logEntries = [];
+
+    function escapeHtml(text) {
+      return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function safeJsonText(value) {
+      if (value == null) return '';
+      if (typeof value === 'string') return value;
+      try { return JSON.stringify(value); } catch { return String(value); }
+    }
+
+    function errorToMessage(err) {
+      if (err instanceof Error) {
+        const msg = typeof err.message === 'string' ? err.message.trim() : safeJsonText(err.message);
+        if (msg && msg !== '[object Object]') return msg;
+      }
+      if (typeof err === 'string' && err.trim()) return err.trim();
+      if (err && typeof err === 'object') {
+        const msg = err.message ?? err.msg ?? err.error ?? err.detail;
+        const text = safeJsonText(msg || err);
+        if (text && text !== '[object Object]') return text;
+      }
+      return String(err || '未知错误');
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function formatElapsed(ms) {
+      const sec = Math.max(0, Math.floor(ms / 1000));
+      const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      return `${mm}:${ss}`;
+    }
+
+    function log(message, kind) {
+      const time = new Date().toLocaleTimeString();
+      const cls = kind ? ` ${kind}` : '';
+      logEntries.unshift(`<span class="${cls}">[${time}] ${escapeHtml(message)}</span>`);
+      logEntries = logEntries.slice(0, 220);
+      els.log.innerHTML = logEntries.join('\n');
+    }
+
+    function readJsonCache(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function loadSettings() {
+      try {
+        const obj = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+        obj.useAggregate = Boolean(obj.useAggregate);
+        obj.alwaysRefreshFollowed = Boolean(obj.alwaysRefreshFollowed);
+        obj.smartScan = obj.smartScan !== false;
+        obj.aggregateCookies = Array.isArray(obj.aggregateCookies)
+          ? obj.aggregateCookies.map(item => String(item || '').trim()).filter(Boolean)
+          : [];
+        obj.manualArtistIds = Array.isArray(obj.manualArtistIds)
+          ? obj.manualArtistIds.map(Number).filter(id => Number.isFinite(id) && id > 0)
+          : [];
+        if (typeof obj.scanBackendBase !== 'string') obj.scanBackendBase = '';
+        if (typeof obj.corsProxyBase !== 'string') obj.corsProxyBase = '';
+        if (typeof obj.apiBase !== 'string') obj.apiBase = 'http://127.0.0.1:3000';
+        if (typeof obj.cookie !== 'string') obj.cookie = '';
+        return obj;
+      } catch {
+        return {
+          scanBackendBase: '',
+          corsProxyBase: '',
+          apiBase: 'http://127.0.0.1:3000',
+          cookie: '',
+          useAggregate: false,
+          alwaysRefreshFollowed: false,
+          smartScan: true,
+          aggregateCookies: [],
+          manualArtistIds: []
+        };
+      }
+    }
+
+    function fillFromSavedSettings() {
+      const s = loadSettings();
+      if (els.scanBackendBase) els.scanBackendBase.value = String(s.scanBackendBase || '').trim();
+      els.apiBase.value = String(s.apiBase || 'http://127.0.0.1:3000').trim();
+      els.cookie.value = String(s.cookie || '').trim();
+      els.concurrency.value = String(Math.max(1, Math.min(16, Number(s.concurrency) || 10)));
+      els.smartScan.checked = s.smartScan !== false;
+    }
+
+    function updateManualModeHint() {
+      const count = normalizeArtistIds(els.manualArtists.value).length;
+      const hintEl = document.getElementById('manualModeHint');
+      if (!hintEl) return;
+      if (count > 0) {
+        hintEl.textContent = `当前已启用手动艺人模式：${count} 位艺人。扫描将不会走 9000+ 艺人大缓存或关注来源。`;
+        hintEl.className = 'hint warn';
+        return;
+      }
+      hintEl.textContent = '当前未启用手动艺人模式，将优先使用本地 9000+ 艺人大缓存或关注来源。';
+      hintEl.className = 'hint';
+    }
+
+    function normalizeArtistEntries(items) {
+      const seen = new Set();
+      const list = [];
+      for (const item of Array.isArray(items) ? items : []) {
+        const id = Number(item?.id || item?.artistId || item);
+        if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+        seen.add(id);
+        list.push({
+          id,
+          name: String(item?.name || item?.artistName || '').trim() || `艺人 ${id}`
+        });
+      }
+      return list;
+    }
+
+    function normalizeArtistIds(text) {
+      return Array.from(new Set(
+        String(text || '')
+          .split(/[,\n\r\t ]+/)
+          .map(x => Number(x.trim()))
+          .filter(x => Number.isFinite(x) && x > 0)
+      ));
+    }
+
+    function loadArtistCheckCache() {
+      try {
+        const raw = sessionStorage.getItem(ARTIST_CHECK_CACHE_KEY) || localStorage.getItem(ARTIST_CHECK_CACHE_KEY);
+        const obj = raw ? JSON.parse(raw) : {};
+        return obj && typeof obj === 'object' ? obj : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function readFollowCache() {
+      try {
+        const raw = localStorage.getItem(FOLLOW_CACHE_KEY);
+        if (!raw) return [];
+        const obj = JSON.parse(raw);
+        if (!obj || !Array.isArray(obj.ids)) return [];
+        if (Date.now() - Number(obj.ts || 0) >= 24 * 3600 * 1000) return [];
+        return normalizeArtistEntries(obj.ids);
+      } catch {
+        return [];
+      }
+    }
+
+    async function fetchJSON(url, cfg, opts = {}) {
+      const controller = new AbortController();
+      const timeout = Math.max(1000, Number(opts.timeout) || 15000);
+      const timer = setTimeout(() => controller.abort(), timeout);
+      let res;
+      try {
+        res = await fetch(url, {
+          headers: cfg.cookie ? { 'x-ncm-cookie': cfg.cookie } : undefined,
+          credentials: cfg.cookie ? 'omit' : 'include',
+          signal: controller.signal
+        });
+      } catch (err) {
+        clearTimeout(timer);
+        if (err?.name === 'AbortError') throw new Error(`请求超时：${url}`);
+        throw new Error(`无法连接到 API：${url}。原始错误：${err?.message || err}`);
+      }
+      clearTimeout(timer);
+      const text = await res.text();
+      let body = {};
+      if (text) {
+        try { body = JSON.parse(text); } catch { throw new Error(text.slice(0, 180) || `请求失败 ${res.status}`); }
+      }
+      if (!res.ok) throw new Error(errorToMessage(body.msg || body.message || body) || `HTTP ${res.status}`);
+      if (Number(body.code || 200) !== 200) throw new Error(errorToMessage(body.msg || body.message || body));
+      return body;
+    }
+
+    async function fetchFollowedArtists(cfg) {
+      const url = new URL(cfg.useAggregate ? '/artist/sublist/aggregate' : '/artist/sublist', cfg.apiBase);
+      if (cfg.useAggregate) {
+        url.searchParams.set('limit', '200');
+        url.searchParams.set('maxPages', '200');
+        url.searchParams.set('spinLimit', '8');
+        url.searchParams.set('timestampMode', 'now');
+        if (cfg.aggregateCookies.length) {
+          url.searchParams.set('cookies', JSON.stringify(cfg.aggregateCookies));
+        }
+        const body = await fetchJSON(url.toString(), cfg, { timeout: 30000 });
+        const ids = Array.isArray(body?.ids) ? body.ids : [];
+        return normalizeArtistEntries(ids);
+      }
+      const all = [];
+      const seen = new Set();
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore && !stopRequested) {
+        url.searchParams.set('limit', '200');
+        url.searchParams.set('offset', String(offset));
+        url.searchParams.set('timestamp', String(Date.now()));
+        const body = await fetchJSON(url.toString(), cfg, { timeout: 15000 });
+        const list = Array.isArray(body?.data) ? body.data : [];
+        if (!list.length) break;
+        for (const item of list) {
+          const id = Number(item?.id || item?.artistId);
+          if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+          seen.add(id);
+          all.push({ id, name: String(item?.name || '').trim() || `艺人 ${id}` });
+        }
+        hasMore = body.more !== false && body.hasMore !== false && list.length >= 200;
+        offset += list.length;
+        await sleep(100);
+      }
+      return all;
+    }
+
+    async function loadOwnedArtistSourceCache() {
+      const res = await fetch(resolveScanApi(VA_OWNED_ARTIST_CACHE_ENDPOINT), {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      const ids = Array.isArray(body?.ids)
+        ? body.ids.map(Number).filter(id => Number.isFinite(id) && id > 0)
+        : [];
+      return normalizeArtistEntries(ids);
+    }
+
+    async function resolveArtists(cfg, manualIds) {
+      if (manualIds.length) {
+        return {
+          artists: normalizeArtistEntries(manualIds.map(id => ({ id, name: `艺人 ${id}` }))),
+          sourceLabel: `手动艺人 ${manualIds.length}`
+        };
+      }
+      if (els.preferOwnedCache.checked) {
+        try {
+          const owned = await loadOwnedArtistSourceCache();
+          if (owned.length) {
+            return { artists: owned, sourceLabel: `本地 9000+ 艺人大缓存 ${owned.length}` };
+          }
+        } catch (err) {
+          log(`本地大缓存读取失败，回退其他来源：${errorToMessage(err)}`, 'warn');
+        }
+      }
+      const cached = readFollowCache();
+      if (cached.length && !cfg.alwaysRefreshFollowed) {
+        return { artists: cached, sourceLabel: `关注缓存 ${cached.length}` };
+      }
+      const followed = await fetchFollowedArtists(cfg);
+      return { artists: followed, sourceLabel: `关注艺人 ${followed.length}` };
+    }
+
+    function updateRangeChip() {
+      const start = els.startDate.value || '未设置';
+      const end = els.endDate.value || '未设置';
+      els.rangeChip.textContent = `日期范围：${start} ~ ${end}`;
+    }
+
+    function updateModeChip() {
+      els.modeChip.textContent = els.manualArtists.value.trim()
+        ? '模式：手动艺人 ID'
+        : '模式：关注艺人扫描';
+      updateManualModeHint();
+    }
+
+    function dateOnlyMs(text, endOfDay) {
+      const value = String(text || '').trim();
+      if (!value) return NaN;
+      return new Date(`${value}T${endOfDay ? '23:59:59' : '00:00:00'}`).getTime();
+    }
+
+    function defaultDateRange() {
+      const today = new Date();
+      const end = today.toISOString().slice(0, 10);
+      const start = new Date(today.getTime() - 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      els.startDate.value = start;
+      els.endDate.value = end;
+      updateRangeChip();
+    }
+
+    function setBusy(busy) {
+      els.startBtn.disabled = busy;
+      els.stopBtn.disabled = !busy;
+      els.exportBtn.disabled = busy || currentResults.length === 0;
+    }
+
+    function setLogEntriesFromBackend(logs) {
+      logEntries = (Array.isArray(logs) ? logs : []).map(item => {
+        const cls = item?.kind ? ` ${String(item.kind)}` : '';
+        return `<span class="${cls}">[${escapeHtml(item?.time || '--:--:--')}] ${escapeHtml(item?.message || '')}</span>`;
+      });
+      if (!logEntries.length) {
+        logEntries = ['<span>[系统] 等待后端扫描状态…</span>'];
+      }
+      els.log.innerHTML = logEntries.join('\n');
+    }
+
+    function resetUiState(message) {
+      stopRequested = false;
+      backendTaskId = '';
+      currentResults = [];
+      currentSourceLabel = '未开始';
+      scanStartedAt = 0;
+      if (elapsedTimer) {
+        clearInterval(elapsedTimer);
+        elapsedTimer = null;
+      }
+      els.statArtists.textContent = '0';
+      els.statHits.textContent = '0';
+      els.statAlbums.textContent = '0';
+      els.statOwned.textContent = '0';
+      els.statElapsed.textContent = '00:00';
+      els.progressFill.style.width = '0%';
+      els.summaryHint.textContent = '结果会按发行日期倒序展示，仅包含自有新作。';
+      els.status.textContent = message || '等待开始';
+      els.sourceChip.textContent = '来源：未开始';
+      logEntries = [`<span>[系统] ${escapeHtml(message || '已清空页面状态')}</span>`];
+      els.log.innerHTML = logEntries.join('\n');
+      renderResults([]);
+      setBusy(false);
+    }
+
+    function renderResults(items) {
+      if (!items.length) {
+        els.statAlbums.textContent = '0';
+        els.results.innerHTML = els.startBtn.disabled
+          ? '<div class="empty">扫描中，暂未发现新作。</div>'
+          : '<div class="empty">在当前日期范围内没有发现新作。</div>';
+        return;
+      }
+      const sorted = [...items].sort((a, b) => Number(b?.publishTime || 0) - Number(a?.publishTime || 0));
+      els.statAlbums.textContent = String(sorted.length);
+      els.results.innerHTML = sorted.map(item => `
+        <article class="card">
+          <div class="cover">
+            <img src="${escapeHtml(item.picUrl || 'https://p5.music.126.net/obj/wonDlsKUwrLClGjCm8Kx/13657931954/4f89/ba28/6fdf/2f0ed8d1227bcddc3e39fb8bcbac2bfe.png')}" alt="${escapeHtml(item.name || '未命名专辑')}" loading="lazy" />
+          </div>
+          <span class="badge">自有新作</span>
+          <div class="title">${escapeHtml(item.name || '未命名专辑')}</div>
+          <div class="artist">${escapeHtml((Array.isArray(item.actualArtistNames) && item.actualArtistNames.length ? item.actualArtistNames.join(' / ') : item.artistName) || '未知艺人')}</div>
+          <div class="meta">发行日期：${escapeHtml(new Date(Number(item.publishTime || 0)).toISOString().slice(0, 10) || '')}</div>
+          <div class="meta">厂牌：${escapeHtml(item.company || '未知')}</div>
+          <div class="meta">来源艺人：${escapeHtml((Array.isArray(item.sourceArtistNames) ? item.sourceArtistNames.join(' / ') : '') || item.artistName || '未知')}</div>
+          <div class="links">
+            <a href="${escapeHtml(item.link || '#')}" target="_blank" rel="noopener">打开专辑</a>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function updateSnapshot(snapshot) {
+      if (!snapshot || Number(snapshot.code || 200) !== 200) return;
+      backendTaskId = String(snapshot.id || '');
+      currentResults = Array.isArray(snapshot.results) ? snapshot.results : [];
+      setLogEntriesFromBackend(snapshot.logs);
+      els.statArtists.textContent = String(Number(snapshot.done || 0));
+      els.statHits.textContent = String(Number(snapshot.hits || 0));
+      els.statOwned.textContent = String(Number(snapshot.ownedCacheSize || 0));
+      els.statElapsed.textContent = formatElapsed(Number(snapshot.elapsedMs || 0));
+      els.summaryHint.textContent = String(snapshot.summaryHint || '结果会按发行日期倒序展示，仅包含自有新作。');
+      const total = Number(snapshot.total || 0);
+      const done = Number(snapshot.done || 0);
+      const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+      els.progressFill.style.width = `${percent}%`;
+      const taskConcurrency = Math.max(1, Number(snapshot.concurrency || 0) || Math.max(1, Math.min(16, Number(els.concurrency.value) || 10)));
+      els.status.textContent = `${String(snapshot.statusText || `进度 ${done}/${total}`)} · 并发 ${taskConcurrency}`;
+      renderResults(currentResults);
+    }
+
+    async function fetchBackendStatus() {
+      const res = await fetch(resolveScanApi(NEW_SCAN_STATUS_ENDPOINT), {
+        method: 'GET',
+        credentials: 'include'
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(errorToMessage(body?.message || body) || `HTTP ${res.status}`);
+      }
+      return body;
+    }
+
+    async function stopBackendScan() {
+      const res = await fetch(resolveScanApi(NEW_SCAN_STOP_ENDPOINT), {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || (body.code && Number(body.code) !== 200)) {
+        throw new Error(errorToMessage(body?.message || body) || `HTTP ${res.status}`);
+      }
+      return body;
+    }
+
+    async function clearBackendTask() {
+      const res = await fetch(resolveScanApi(NEW_SCAN_CLEAR_ENDPOINT), {
+        method: 'POST',
+        credentials: 'include'
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || (body.code && Number(body.code) !== 200)) {
+        throw new Error(errorToMessage(body?.message || body) || `HTTP ${res.status}`);
+      }
+      return body;
+    }
+
+    async function ensureBackendTaskIdle() {
+      const snapshot = await fetchBackendStatus().catch(() => ({ code: 404 }));
+      if (Number(snapshot?.code || 404) !== 200) return;
+      if (snapshot?.running) {
+        log('检测到残留新作扫描任务，先自动停止后再启动新任务...', 'warn');
+        await stopBackendScan();
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          await sleep(500);
+          const next = await fetchBackendStatus().catch(() => ({ code: 404 }));
+          if (Number(next?.code || 404) !== 200 || !next?.running) break;
+        }
+        const pending = await fetchBackendStatus().catch(() => ({ code: 404 }));
+        if (Number(pending?.code || 404) === 200 && pending?.running) {
+          throw new Error('旧的新作扫描任务仍未停止，请稍后再试。');
+        }
+      }
+      await clearBackendTask().catch(() => {});
+    }
+
+    async function startBackendScan(payload) {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const res = await fetch(resolveScanApi(NEW_SCAN_START_ENDPOINT), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const body = await res.json().catch(() => ({}));
+        if (res.ok && Number(body?.code || 200) === 200) {
+          if (body.task) updateSnapshot(body.task);
+          return body.task;
+        }
+        const msg = errorToMessage(body?.message || body) || `HTTP ${res.status}`;
+        if (res.status === 409 && /已有新作扫描任务在运行/.test(msg) && attempt === 0) {
+          await ensureBackendTaskIdle();
+          continue;
+        }
+        throw new Error(msg);
+      }
+      throw new Error('启动新作后端扫描失败，请稍后重试。');
+    }
+
+    async function waitForBackendCompletion(taskId) {
+      while (true) {
+        if (stopRequested) {
+          try { await stopBackendScan(); } catch {}
+        }
+        const snapshot = await fetchBackendStatus();
+        if (Number(snapshot.code || 200) !== 200) {
+          throw new Error(errorToMessage(snapshot?.message || snapshot));
+        }
+        if (taskId && String(snapshot.id || '') !== String(taskId)) {
+          throw new Error('后端扫描任务已被替换，请重新开始。');
+        }
+        updateSnapshot(snapshot);
+        if (!snapshot.running) return snapshot;
+        await sleep(900);
+      }
+    }
+
+    function resetForRun() {
+      resetUiState('扫描中…');
+      logEntries = ['<span>[系统] 已开始新一轮新作扫描</span>'];
+      els.log.innerHTML = logEntries.join('\n');
+      els.results.innerHTML = '<div class="empty">扫描中…</div>';
+      scanStartedAt = Date.now();
+      if (elapsedTimer) clearInterval(elapsedTimer);
+      elapsedTimer = setInterval(() => {
+        els.statElapsed.textContent = formatElapsed(Date.now() - scanStartedAt);
+      }, 500);
+    }
+
+    function finishRun() {
+      if (elapsedTimer) {
+        clearInterval(elapsedTimer);
+        elapsedTimer = null;
+      }
+      els.statElapsed.textContent = formatElapsed(Date.now() - scanStartedAt);
+      setBusy(false);
+      els.exportBtn.disabled = currentResults.length === 0;
+    }
+
+    function exportCsv() {
+      if (!currentResults.length) return;
+      const rows = [
+        ['专辑名', '艺人', '来源艺人', '发行时间', '厂牌', '专辑链接'],
+        ...currentResults.map(item => [
+          item.name,
+          Array.isArray(item.actualArtistNames) ? item.actualArtistNames.join(' / ') : item.artistName,
+          Array.isArray(item.sourceArtistNames) ? item.sourceArtistNames.join(' / ') : item.artistName,
+          Number(item.publishTime || 0) ? new Date(Number(item.publishTime || 0)).toISOString().slice(0, 10) : '',
+          item.company || '',
+          item.link || ''
+        ])
+      ];
+      const csv = '\ufeff' + rows.map(row => row.map(cell => {
+        const text = String(cell == null ? '' : cell).replace(/"/g, '""');
+        return /[",\n]/.test(text) ? `"${text}"` : text;
+      }).join(',')).join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `netease-new-release-scan-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function startScan() {
+      const saved = loadSettings();
+      const manualIds = normalizeArtistIds(els.manualArtists.value);
+      const cfg = {
+        apiBase: String(els.apiBase.value || '').trim(),
+        cookie: String(els.cookie.value || '').trim(),
+        useAggregate: Boolean(saved.useAggregate),
+        aggregateCookies: Array.isArray(saved.aggregateCookies) ? saved.aggregateCookies : [],
+        alwaysRefreshFollowed: Boolean(saved.alwaysRefreshFollowed),
+        smartScan: els.smartScan.checked
+      };
+      const rangeStart = dateOnlyMs(els.startDate.value, false);
+      const rangeEnd = dateOnlyMs(els.endDate.value, true);
+      const concurrency = Math.max(1, Math.min(16, Number(els.concurrency.value) || 10));
+      if (!cfg.apiBase) {
+        alert('请先填写 API 基地址');
+        return;
+      }
+      if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd) || rangeStart > rangeEnd) {
+        alert('请设置有效的日期范围');
+        return;
+      }
+
+      resetForRun();
+      updateRangeChip();
+      updateModeChip();
+      setBusy(true);
+
+      try {
+        await ensureBackendTaskIdle();
+        const resolved = await resolveArtists(cfg, manualIds);
+        currentSourceLabel = resolved.sourceLabel;
+        els.sourceChip.textContent = `来源：${currentSourceLabel}`;
+        if (manualIds.length) {
+          log(`当前为手动模式，仅扫描 ${manualIds.length} 位艺人；如需全量测速，请清空“手动艺人 ID 列表”。`, 'warn');
+        }
+        log(`本次扫描来源：${currentSourceLabel}`, 'ok');
+        if (!resolved.artists.length) {
+          throw new Error('没有可扫描的艺人');
+        }
+        const task = await startBackendScan({
+          cfg: {
+            apiBase: cfg.apiBase,
+            cookie: cfg.cookie
+          },
+          artists: resolved.artists,
+          smartScan: cfg.smartScan,
+          artistCheckCache: loadArtistCheckCache(),
+          rangeStart,
+          rangeEnd,
+          concurrency
+        });
+        await waitForBackendCompletion(task?.id);
+      } catch (err) {
+        const msg = errorToMessage(err);
+        log(`扫描中断：${msg}`, 'err');
+        els.status.textContent = `扫描失败：${msg}`;
+      } finally {
+        finishRun();
+      }
+    }
+
+    els.fillFromSettings.addEventListener('click', () => {
+      fillFromSavedSettings();
+      updateModeChip();
+      log('已从增强页本地设置读取 apiBase / Cookie / 并发 / smartScan。', 'ok');
+    });
+    els.startDate.addEventListener('change', updateRangeChip);
+    els.endDate.addEventListener('change', updateRangeChip);
+    els.manualArtists.addEventListener('input', updateModeChip);
+    els.startBtn.addEventListener('click', () => {
+      startScan().catch(err => log(`启动失败：${errorToMessage(err)}`, 'err'));
+    });
+    els.stopBtn.addEventListener('click', () => {
+      stopRequested = true;
+      els.status.textContent = '正在停止扫描...';
+      stopBackendScan().catch(err => log(`停止请求失败：${errorToMessage(err)}`, 'warn'));
+    });
+    els.exportBtn.addEventListener('click', exportCsv);
+
+    fillFromSavedSettings();
+    els.manualArtists.value = '';
+    defaultDateRange();
+    updateModeChip();
+    resetUiState('已清空旧进度；当前页每次重载后默认从空白状态开始。');
+    log('已读取增强页设置；当前页默认不继承增强页里的手动艺人列表，避免误入手动模式。', 'ok');
+    ensureBackendTaskIdle().catch(err => log(`初始化清理后端残留任务失败：${errorToMessage(err)}`, 'warn'));
+    window.addEventListener('pageshow', () => {
+      resetUiState('已重置页面显示，避免回显上一轮扫描卡片。');
+    });
+    window.addEventListener('beforeunload', () => {
+      try {
+        navigator.sendBeacon(NEW_SCAN_STOP_ENDPOINT, new Blob([], { type: 'application/json' }));
+      } catch {}
+    });
+  </script>
+</body>
+</html>

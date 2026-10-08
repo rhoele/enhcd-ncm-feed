@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>网易云关注艺人新作速递 · 增强版</title>
+  <link rel="stylesheet" href="styles.css?v=20260619-enhanced-ui-phase2-2" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="header-main">
+      <h1>关注艺人新作速递（增强版）</h1>
+      <div id="progressText" class="header-status">准备中…</div>
+      <div class="header-tabs" role="tablist" aria-label="增强页扫描结果标签">
+        <button id="tabNewReleases" class="tab-btn is-active" type="button" role="tab" aria-selected="true" data-tab-target="new">扫描新作</button>
+        <button id="tabCompilations" class="tab-btn" type="button" role="tab" aria-selected="false" data-tab-target="compilation">扫描合辑</button>
+        <button id="tabLabels" class="tab-btn" type="button" role="tab" aria-selected="false" data-tab-target="labels">厂牌汇总</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="refreshBtn" class="btn primary">立即刷新</button>
+      <button id="pauseBtn" class="btn danger" disabled>暂停扫描</button>
+      <button id="openSettings" class="btn">设置</button>
+    </div>
+    <div class="header-stats" aria-label="增强页扫描统计">
+      <section class="header-stat-card">
+        <div class="header-stat-label">扫描艺人数</div>
+        <div id="headerStatArtists" class="header-stat-value">0</div>
+      </section>
+      <section class="header-stat-card">
+        <div class="header-stat-label">命中合辑单曲</div>
+        <div id="headerStatHits" class="header-stat-value">0</div>
+      </section>
+      <section class="header-stat-card">
+        <div class="header-stat-label">扫描结果专辑数</div>
+        <div id="headerStatAlbums" class="header-stat-value">0</div>
+      </section>
+      <section class="header-stat-card">
+        <div class="header-stat-label">已检查专辑日期</div>
+        <div id="headerStatCheckedAlbums" class="header-stat-value">0</div>
+      </section>
+      <section class="header-stat-card">
+        <div class="header-stat-label">耗时</div>
+        <div id="headerStatElapsed" class="header-stat-value">00:00</div>
+      </section>
+    </div>
+    <div id="progressBar" class="header-progress"><div id="progressFill" class="fill"></div></div>
+  </header>
+
+  <main>
+    <section class="notice">
+      <p>增强版：启用更强的订阅列表分页扫描，尝试突破 4900 上限；并提供图形化进度条显示。</p>
+    </section>
+
+    <!-- Diagnostics moved here, hidden by default -->
+    <pre id="diagnostics" class="hint diagnostics"></pre>
+
+    <section id="feedPanel" class="result-panel is-active" data-tab-panel="new" role="tabpanel" aria-labelledby="tabNewReleases">
+      <section id="feed" class="feed">
+        <div class="empty">尚未加载数据，点击右上角“设置”并保存后刷新。</div>
+      </section>
+    </section>
+
+    <section id="compilationPanel" class="result-panel" data-tab-panel="compilation" role="tabpanel" aria-labelledby="tabCompilations" hidden>
+      <section id="compilationFeed" class="feed">
+        <div class="empty">合辑扫描结果区尚未生成数据。</div>
+      </section>
+    </section>
+
+    <section id="labelsPanel" class="result-panel" data-tab-panel="labels" role="tabpanel" aria-labelledby="tabLabels" hidden>
+      <div class="section-subtitle">厂牌汇总</div>
+      <section id="labelsFeed" class="feed">
+        <div class="empty">厂牌汇总区尚未生成数据。</div>
+      </section>
+    </section>
+
+    <section id="globalPanel" class="aux-panel">
+      <div class="section-subtitle">扩展区</div>
+      <section id="globalFeed" class="feed">
+        <div class="empty">扩展区尚未生成数据（当关注列表被平台限制时用于补充当天全平台新作）。</div>
+      </section>
+    </section>
+
+    <!-- Spotify 厂牌自动检索（高级版） -->
+    <div class="mt-xl">
+      <div class="section-header">
+        <h3>Spotify 厂牌自动检索 (高级版)</h3>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <label style="font-size:13px; color:#666;">目标日期: <input type="date" id="spBatchDate" style="border:1px solid #ccc; padding:2px 4px; border-radius:3px;" /></label>
+          <label style="font-size:13px; color:#666;">范围(天): <input type="number" id="spBatchDays" value="1" min="1" style="width:40px; border:1px solid #ccc; padding:2px 4px; border-radius:3px;" /></label>
+          <button id="btnSpBatchStart" class="btn primary sm" onclick="window.startSpBatchSearch(); return false;">开始检索 (高精度模式)</button>
+          <button id="btnSpBatchStop" class="btn sm" onclick="window.stopSpBatchSearch(); return false;" disabled>停止</button>
+          <button id="btnSpBatchExport" class="btn sm" onclick="window.exportSpBatchResults(); return false;" disabled>导出结果</button>
+          <button id="btnSpMock" class="btn sm" onclick="window.showSpMockCard(); return false;">生成测试卡片</button>
+        </div>
+        <div id="spBatchProgress" class="progress" style="display:none; margin-top:10px;"><div id="spBatchFill" class="fill"></div></div>
+        <div id="spBatchStatus" class="hint" style="margin-top:5px;"></div>
+      </div>
+      <section id="spotifyAutoFeed" class="feed">
+        <div class="empty">点击上方“开始检索”以获取数据。将使用备份版本的高精度扫描模式。</div>
+      </section>
+    </div>
+  </main>
+
+  <dialog id="settingsDialog" class="settings">
+    <form method="dialog">
+      <h2>设置</h2>
+      <fieldset style="margin-bottom:10px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;">
+        <legend style="font-weight:600">本地后端接口地址（部署到 GitHub Pages 时必填）</legend>
+        <label>
+          扫描与缓存接口 (start-static.js)
+          <input id="scanBackendBase" placeholder="例如 http://127.0.0.1:8001（本机运行时留空即可）" />
+          <small class="hint">增强页 / 合辑 / 新作扫描的后端接口；本地从 8001 打开时可留空。</small>
+        </label>
+        <label style="margin-top:8px;display:block">
+          CORS 代理接口 (cors-proxy.js)
+          <input id="corsProxyBase" placeholder="例如 http://127.0.0.1:8012（本机运行时留空即可）" />
+          <small class="hint">Spotify 凭证 / 批量艺人校验 / 同步关注缓存 等；本地从 8001 打开时可留空。</small>
+        </label>
+      </fieldset>
+      <label>
+        API 基地址
+        <input id="apiBase" placeholder="例如：http://127.0.0.1:3000（网易云本地 API）" />
+      </label>
+      <label>
+        登录 Cookie（仅在使用公开/自部署 API 且支持 cookie 参数时填写）
+        <textarea id="cookie" rows="4" placeholder="示例：MUSIC_U=...; __remember_me=true; NMTID=...;"></textarea>
+      </label>
+      <div class="inline-actions">
+        <button id="qrLogin" class="btn">扫码登录（推荐）</button>
+        <a id="openWeb" class="btn" href="#" onclick="return false;">打开网易云网页</a>
+      </div>
+      <label>
+        手动艺人ID列表（可选，逗号分隔；如无需登录可用此方式）
+        <textarea id="manualArtistIds" rows="3" placeholder="如：2116,5781,12429072"></textarea>
+        <div class="inline-actions">
+          <input id="manualArtistName" type="text" placeholder="按艺人名搜索并加入，例如：Said The Sky" />
+          <button id="addArtistByName" class="btn" onclick="return false;">添加</button>
+        </div>
+        <small id="addArtistStatus" class="hint"></small>
+        <div class="inline-actions">
+          <input id="importIdsFile" type="file" accept=".txt,.csv" />
+          <button id="btnImportIds" class="btn" onclick="return false;">导入 IDs 文件</button>
+          <button id="btnExportFollow" class="btn" onclick="return false;">导出关注窗口快照</button>
+          <button id="btnExportFollowJson" class="btn" onclick="return false;">导出关注 (JSON)</button>
+        </div>
+        <small id="importIdsStatus" class="hint"></small>
+      </label>
+
+      <label>
+        启用聚合关注抓取（多 Cookie 合并）
+        <div class="inline-actions">
+          <input id="useAggregate" type="checkbox" />
+          <small class="hint">勾选后前端改用后端聚合路由抓取关注列表</small>
+        </div>
+        <textarea id="aggregateCookies" rows="3" placeholder="可选：每行一个 Cookie；留空则使用当前 Cookie"></textarea>
+        <small class="hint">聚合抓取可突破单 Cookie 的分页窗口限制，需要多个有效 Cookie</small>
+      </label>
+      <label>
+        从歌单导入艺人（ID 或完整 URL）
+        <input id="playlistSource" type="text" placeholder="例如：12326521326 或 https://music.163.com/#/playlist?id=123..." />
+        <small class="hint">当单账号难以突破 4900 限制时，可从大型歌单扫描曲目并导入对应艺人。</small>
+        <div class="inline-actions">
+          <input id="useCachedPlaylistArtists" type="checkbox" /> 使用上次扫描的歌单艺人（跳过本次扫描，加速）
+        </div>
+        <div class="inline-actions">
+          <button id="btnRunPlaylistImportTask" type="button" class="btn" onclick="runPlaylistImportTask(); return false;">运行一次性歌单导入任务</button>
+          <small class="hint">仅扫描并导入未关注艺人到抓取列表（不触发主刷新）。</small>
+          <small id="playlistImportStatus" class="hint"></small>
+        </div>
+      </label>
+      <label>
+        收藏弹窗置顶歌单（可选）
+        <textarea id="pinnedPlaylistIds" rows="2" placeholder="可填歌单 ID，逗号分隔；也可直接在收藏弹窗里点“置顶”自动保存"></textarea>
+        <small class="hint">这些歌单会始终显示在收藏悬浮窗最前排，便于快速收藏到常用歌单。</small>
+      </label>
+      <label>
+        <input id="onlyShowFollowedInFeed" type="checkbox" /> 首页仅显示已关注艺人（不包含手动/歌单）
+      </label>
+      <label>
+        <input id="fastSublistScan" type="checkbox" /> 快速分页扫描（减少间隔并提高并发，可能更易触发限流）
+      </label>
+      <label>
+        <input id="smartScan" type="checkbox" checked /> 智能增量扫描（效率极高：仅扫描专辑数有变化的艺人，推荐开启）
+        <small class="hint">通过对比艺人专辑总数，仅对有新作品的艺人进行详细扫描。首次运行会建立基准。</small>
+      </label>
+      <label>
+        扫描并发数 (Concurrency)
+        <input id="concurrency" type="number" min="1" max="20" placeholder="默认 4" style="width:100px" />
+        <small class="hint">增强页默认按 4 并发运行，以对齐合辑测试页；建议 4-5。</small>
+      </label>
+      <label>
+        <input id="dualLineScan" type="checkbox" /> 双线扫描模式（分两组并行扫描，显著提升速度，需更强网络/API支持）
+      </label>
+      <label>
+        <input id="alwaysRefreshFollowed" type="checkbox" /> 总是刷新关注列表（忽略缓存）
+      </label>
+      <label>
+        <input id="skipRescanNextOnce" type="checkbox" /> 总是优先使用关注列表缓存（跳过扫描）
+        <small class="hint">持久选项：勾选后，每次刷新都将直接复用缓存的关注列表，不再重新扫描。</small>
+      </label>
+      <label>
+        <input id="ignoreSkip" type="checkbox" /> 忽略“近期无新作跳过”（本次强制全量检查）
+      </label>
+      <label>
+        Netease 厂牌检索（仅限近期新作）
+        <div class="inline-actions">
+          <input id="labelKeyword" type="text" placeholder="例如：Stardust" />
+          <button id="fetchLabelToday" class="btn" onclick="return false;">检索</button>
+        </div>
+        <div class="inline-actions">
+          <label><input id="labelOnlyFollowed" type="checkbox" checked /> 仅限已关注艺人</label>
+        </div>
+        <small class="hint">注：仅扫描网易云“新碟上架”榜单，可能遗漏非热门发布。如需全面检索，请使用下方 Spotify 功能。</small>
+        <small id="labelSearchStatus" class="hint"></small>
+      </label>
+      <label>
+        时间范围（天）
+        <input id="daysRange" type="number" min="1" max="30" placeholder="默认 1（仅今天）" />
+      </label>
+      <label>
+        目标日期（留空为今天）
+        <input id="targetDate" type="date" />
+      </label>
+      <fieldset>
+        <legend>Spotify 高级检索（支持 PKCE/Client Credentials）</legend>
+        <div style="margin-bottom:10px;">
+          <label style="display:inline-block; margin-right:15px;"><input type="radio" name="spAuthMode" value="pkce" checked onchange="window.toggleSpAuthMode()"> 个人账号 (PKCE)</label>
+          <label style="display:inline-block;"><input type="radio" name="spAuthMode" value="client" onchange="window.toggleSpAuthMode()"> 应用凭证 (Client Credentials, 推荐)</label>
+        </div>
+        
+        <label>
+          Client ID
+          <input id="spClientId" type="text" placeholder="Spotify Client ID" value="668aaab2a5ac4085aae1146e29c19193" />
+        </label>
+        
+        <div id="spSecretBox" style="display:none;">
+          <label>
+            Client Secret
+            <input id="spClientSecret" type="password" placeholder="Spotify Client Secret" value="ca8df2ff33e34954b9f8782c8257624d" />
+          </label>
+          <small class="hint">仅 Client Credentials 模式需要。此模式配合本地代理可大幅缓解限流。</small>
+        </div>
+
+        <div class="inline-actions" style="margin-top:10px;">
+          <button type="button" id="btnSpLogin" class="btn" onclick="window.handleSpLogin(); return false;">登录 / 获取 Token</button>
+          <button type="button" class="btn" onclick="window.clearSpToken(); return false;">清除 Token</button>
+          <button type="button" class="btn" onclick="document.getElementById('spTokenStatus').textContent = localStorage.getItem('spotify_user_token') ? 'Token 存在' : 'Token 不存在'; return false;">测试 Token</button>
+          <span id="spTokenStatus" class="hint" style="margin-left:10px;">检查中...</span>
+        </div>
+        
+        <small class="hint">
+          注意：请在 Spotify 开发者后台将 Redirect URI 设为 <b>当前页面 URL</b> (例如 http://127.0.0.1:8001/index-enhanced.html)。
+        </small>
+      </fieldset>
+      <div class="inline-actions">
+        <button id="btnCheckLogin" type="button" class="btn" onclick="runDiagnostics(); return false;">检查登录与关注列表</button>
+        <small id="diagStatus" class="hint"></small>
+      </div>
+      <menu>
+        <button value="cancel" class="btn">取消</button>
+        <button id="saveSettings" value="default" class="btn primary">保存</button>
+        <button id="btnMigrateSettings" type="button" class="btn">一键恢复旧设置</button>
+        <span class="inline-actions">
+          <input id="oldPortManual" type="text" placeholder="旧端口（如 8083）" style="width:120px" />
+          <button id="btnMigrateFromPort" type="button" class="btn">指定端口迁移</button>
+        </span>
+        <button id="btnExportSettings" type="button" class="btn">导出配置</button>
+        <button id="btnImportSettings" type="button" class="btn">导入配置</button>
+      </menu>
+      <input id="inputImportSettings" type="file" accept=".json,application/json" style="display:none" />
+      <p class="hint">提示：
+        - 推荐使用自部署 API（Binaryify/NeteaseCloudMusicApi）并在设置中填入地址；
+        - 若无法登录，可在网页端复制 Cookie 粘贴到此，或手动填入关注艺人ID列表；
+        - 数据仅保存在本地浏览器 LocalStorage。</p>
+    </form>
+  </dialog>
+
+  <dialog id="qrDialog" class="settings">
+    <form method="dialog">
+      <h2>扫码登录网易云</h2>
+      <div class="qrBox">
+        <img id="qrImg" alt="二维码" />
+        <p id="qrStatus">正在生成二维码…</p>
+      </div>
+      <menu>
+        <button value="cancel" class="btn">关闭</button>
+      </menu>
+      <p class="hint">请使用手机网易云扫描二维码并确认登录。登录成功后，Cookie 会自动写入设置。</p>
+    </form>
+  </dialog>
+
+  <dialog id="playlistPickerDialog" class="settings">
+    <form method="dialog">
+      <h2 id="playlistPickerTitle">收藏到歌单</h2>
+      <p id="playlistPickerMeta" class="hint">请选择一个或多个歌单。</p>
+      <div class="playlist-picker-layout">
+        <section id="playlistPickerTrackSection" class="playlist-picker-pane playlist-picker-track-section" hidden>
+          <div class="playlist-pane-head">
+            <div>
+              <h3>曲目选择</h3>
+              <div id="playlistPickerTrackSelectedCount" class="hint">已选曲目 0 首</div>
+            </div>
+            <div class="inline-actions">
+              <button id="playlistPickerTrackSelectAll" type="button" class="btn">全选曲目</button>
+              <button id="playlistPickerTrackClear" type="button" class="btn">清空曲目勾选</button>
+            </div>
+          </div>
+          <div id="playlistPickerTrackList" class="playlist-picker-track-list">
+            <div class="empty">正在加载曲目…</div>
+          </div>
+        </section>
+        <section class="playlist-picker-pane playlist-picker-playlist-section">
+          <div class="playlist-pane-head">
+            <div>
+              <h3>歌单选择</h3>
+              <div id="playlistPickerSelectedCount" class="hint">已选歌单 0 个</div>
+            </div>
+          </div>
+          <label>
+            搜索歌单
+            <input id="playlistPickerSearch" type="text" placeholder="输入歌单名过滤" />
+          </label>
+          <div id="playlistPickerStatus" class="hint"></div>
+          <div id="playlistPickerList" class="playlist-picker-list">
+            <div class="empty">正在加载歌单…</div>
+          </div>
+        </section>
+      </div>
+      <menu>
+        <button value="cancel" class="btn">取消</button>
+        <button id="playlistPickerSubmit" type="button" class="btn primary">添加到所选歌单</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="commentDialog" class="settings">
+    <form method="dialog">
+      <h2 id="commentDialogTitle">评论</h2>
+      <p id="commentDialogMeta" class="hint">可查看最新评论并直接发表评论。</p>
+      <div id="commentDialogStatus" class="hint"></div>
+      <div id="commentList" class="comment-list">
+        <div class="empty">正在加载评论…</div>
+      </div>
+      <label>
+        发表评论
+        <textarea id="commentInput" rows="4" placeholder="输入评论内容"></textarea>
+      </label>
+      <menu>
+        <button id="commentRefreshBtn" type="button" class="btn">刷新评论</button>
+        <button value="cancel" class="btn">关闭</button>
+        <button id="commentSubmitBtn" type="button" class="btn primary">发送评论</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <footer class="footer">
+    <div>每日 00:00 自动刷新 · 上次刷新：<span id="lastRun">从未</span></div>
+  </footer>
+
+  <script>window.__ENHANCED_MODE__ = true;</script>
+  <script src="seed-settings.js"></script>
+  <script src="auto-restore.js"></script>
+  <script src="app.js?v=20261009-seed-default"></script>
+  <script>
+  (function(){
+    try {
+      var LS_KEY = 'netease-feed-settings-v1';
+      var migratedFlag = localStorage.getItem('settings_migrated_v1');
+      // 放开端口限制：任意端口均尝试从 8080 拉取旧设置（仅首次）
+      function triggerSettingsMigration(){
+        var received = false;
+        var popupRef = null;
+        var ports = [8080,8081,8082,8083,8085,8090,8091,8092];
+        var hosts = ['http://localhost:', 'http://127.0.0.1:'];
+        var candidates = [ location.origin ];
+        for (var i=0;i<hosts.length;i++){
+          for (var j=0;j<ports.length;j++){
+            candidates.push(hosts[i] + String(ports[j]));
+          }
+        }
+        var allowed = candidates.slice();
+        var idx = 0;
+        function tryNext(){
+          if(received) return;
+          if(idx >= candidates.length){ return; }
+          var base = candidates[idx++];
+          if(base === location.origin){
+            try{
+              var iframe = document.createElement('iframe');
+              iframe.style.display = 'none';
+              iframe.src = './storage-bridge.html?ts=' + Date.now();
+              document.body.appendChild(iframe);
+            }catch(e){}
+            setTimeout(tryNext, 600);
+            return;
+          }
+          try{
+            // 优先尝试 iframe，若被策略阻止则回退弹窗
+            var cross = document.createElement('iframe');
+            cross.style.display = 'none';
+            cross.src = base + '/storage-bridge.html?ts=' + Date.now();
+            document.body.appendChild(cross);
+          }catch(e){}
+          setTimeout(function(){
+            if(!received){
+              try{ popupRef = window.open(base + '/storage-bridge.html?ts=' + Date.now(), 'storageBridge', 'width=420,height=240'); }catch(e){}
+            }
+          }, 500);
+          setTimeout(function(){ if(!received) tryNext(); }, 1600);
+        }
+        var onMessage = function(ev){
+          try {
+            var okOrigin = ev && allowed.indexOf(ev.origin) >= 0;
+            if (!okOrigin) return;
+            var msg = ev.data || {};
+            if (msg.type !== 'storage_dump') return;
+            var data = msg.data || {};
+            received = true;
+            Object.keys(data).forEach(function(k){
+              var v = data[k];
+              if (v != null) { try { localStorage.setItem(k, v); } catch(e){} }
+            });
+            if (data['__spotifyToken']) { try { window.__spotifyToken = data['__spotifyToken']; } catch(e){} }
+            try { localStorage.setItem('settings_migrated_v1', 'done'); } catch(e){}
+            try {
+              if (typeof loadSettings === 'function' && typeof bindSettingsUI === 'function') {
+                var s = loadSettings();
+                bindSettingsUI(s);
+              }
+            } catch(e){}
+            try { if (popupRef && !popupRef.closed) popupRef.close(); } catch(e){}
+            try { setTimeout(function(){ location.reload(); }, 120); } catch(e){}
+          } catch(ex){}
+        };
+        window.addEventListener('message', onMessage, { once: true });
+        tryNext();
+      }
+      // 暴露按钮触发
+      window.triggerSettingsMigration = triggerSettingsMigration;
+      window.triggerSettingsMigrationFrom = function(port){
+        try{
+          port = String(port||'').trim();
+          if(!port){ alert('请输入旧端口，例如 8083'); return; }
+          var received = false;
+          var popupRef = null;
+          var candidates = ['http://localhost:'+port,'http://127.0.0.1:'+port];
+          var allowed = candidates.slice();
+          var idx = 0;
+          function tryNext(){
+            if(received) return; if(idx>=candidates.length) return;
+            var base = candidates[idx++];
+            try{
+              var cross = document.createElement('iframe');
+              cross.style.display = 'none';
+              cross.src = base + '/storage-bridge.html?ts=' + Date.now();
+              document.body.appendChild(cross);
+            }catch(e){}
+            setTimeout(function(){ if(!received){ try{ popupRef = window.open(base + '/storage-bridge.html?ts=' + Date.now(), 'storageBridge', 'width=420,height=240'); }catch(e){} } }, 500);
+            setTimeout(function(){ if(!received) tryNext(); }, 1600);
+          }
+          var onMessage = function(ev){
+            try{
+              var okOrigin = ev && allowed.indexOf(ev.origin) >= 0; if(!okOrigin) return;
+              var msg = ev.data || {}; if(msg.type !== 'storage_dump') return;
+              var data = msg.data || {}; received = true;
+              Object.keys(data).forEach(function(k){ var v = data[k]; if(v!=null){ try{ localStorage.setItem(k, v); }catch(e){} } });
+              if(data['__spotifyToken']){ try{ window.__spotifyToken = data['__spotifyToken']; }catch(e){} }
+              try{ localStorage.setItem('settings_migrated_v1','done'); }catch(e){}
+              try{ if(typeof loadSettings==='function' && typeof bindSettingsUI==='function'){ var s=loadSettings(); bindSettingsUI(s); } }catch(e){}
+              try{ if(popupRef && !popupRef.closed) popupRef.close(); }catch(e){}
+              try{ setTimeout(function(){ location.reload(); }, 120); }catch(e){}
+            }catch(ex){}
+          };
+          window.addEventListener('message', onMessage, { once: true });
+          tryNext();
+        }catch(e){ alert('迁移失败：'+(e && e.message || e)); }
+      };
+      var migratedFlag2 = localStorage.getItem('settings_migrated_v1');
+      if (migratedFlag2 !== 'done') { triggerSettingsMigration(); }
+      // 绑定按钮
+      try{
+        var btn = document.getElementById('btnMigrateSettings');
+        if(btn && !btn.__bound){ btn.__bound = true; btn.addEventListener('click', function(ev){ ev.preventDefault(); triggerSettingsMigration(); }); }
+        var btn2 = document.getElementById('btnMigrateFromPort');
+        var inp = document.getElementById('oldPortManual');
+        if(btn2 && !btn2.__bound){ btn2.__bound = true; btn2.addEventListener('click', function(ev){ ev.preventDefault(); var p = inp && inp.value; window.triggerSettingsMigrationFrom(p); }); }
+      }catch(e){}
+
+      // 导出/导入配置
+      function collectAllLocalStorage(){
+        var data = {};
+        try{
+          for (var i=0;i<localStorage.length;i++){
+            var k = localStorage.key(i);
+            try { data[k] = localStorage.getItem(k); } catch(e){}
+          }
+        }catch(e){}
+        return data;
+      }
+      function exportSettings(){
+        try{
+          var payload = {
+            type: 'netease-artist-feed-settings',
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            origin: location.origin,
+            data: collectAllLocalStorage()
+          };
+          try {
+            var st = window.__spotifyToken || localStorage.getItem('__spotifyToken');
+            if(st){ payload.secrets = { __spotifyToken: st }; }
+          } catch(e){}
+          var name = 'netease-artist-feed-settings-' + (new Date().toISOString().slice(0,10)) + '.json';
+          var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+          var a = document.createElement('a');
+          a.download = name;
+          a.href = URL.createObjectURL(blob);
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} }, 1200);
+        }catch(e){ try{ alert('导出失败：' + e.message); }catch(_e){} }
+      }
+      function importSettingsFromFile(file){
+        try{
+          var reader = new FileReader();
+          reader.onload = function(){
+            var txt = reader.result;
+            var obj;
+            try { obj = JSON.parse(txt); } catch(e){ alert('配置文件格式错误'); return; }
+            if (!obj || obj.type !== 'netease-artist-feed-settings'){
+              var go = confirm('未识别的文件类型，是否仍尝试导入全部键值？');
+              if(!go) return;
+            }
+            var data = obj.data || obj || {};
+            try{
+              Object.keys(data).forEach(function(k){
+                var v = data[k];
+                if (v != null) { try { localStorage.setItem(k, v); } catch(e){} }
+              });
+            }catch(e){}
+            try{
+              if (obj.secrets && obj.secrets.__spotifyToken){
+                localStorage.setItem('__spotifyToken', obj.secrets.__spotifyToken);
+                window.__spotifyToken = obj.secrets.__spotifyToken;
+              }
+            }catch(e){}
+            try { localStorage.setItem('settings_migrated_v1', 'done'); } catch(e){}
+            try{
+              if (typeof loadSettings === 'function' && typeof bindSettingsUI === 'function'){
+                var s = loadSettings();
+                bindSettingsUI(s);
+              }
+            }catch(e){}
+            try { setTimeout(function(){ location.reload(); }, 200); } catch(e){}
+          };
+          reader.readAsText(file);
+        }catch(e){ try{ alert('导入失败：' + e.message); }catch(_e){} }
+      }
+      try{
+        var btnExport = document.getElementById('btnExportSettings');
+        var btnImport = document.getElementById('btnImportSettings');
+        var inputFile = document.getElementById('inputImportSettings');
+        if(btnExport && !btnExport.__bound){ btnExport.__bound = true; btnExport.addEventListener('click', function(ev){ ev.preventDefault(); exportSettings(); }); }
+        if(btnImport && inputFile && !btnImport.__bound){
+          btnImport.__bound = true;
+          btnImport.addEventListener('click', function(ev){ ev.preventDefault(); inputFile.click(); });
+          inputFile.addEventListener('change', function(){
+            try{ if(inputFile.files && inputFile.files[0]) importSettingsFromFile(inputFile.files[0]); }catch(e){}
+            try{ inputFile.value = ''; }catch(e){}
+          });
+        }
+      }catch(e){}
+    } catch(e){}
+  })();
+  </script>
+<script>
+(function() {
+  const SP_PROXY = 'http://127.0.0.1:8012';
+  const SP_REDIRECT_URI = window.location.origin + window.location.pathname;
+  let spAccessToken = null;
+  let spIsSearching = false;
+  let spResults = [];
+  
+  const SP_DEFAULT_LABELS = [
+    'Ufality','Stardust','Sizeland','ARWV','Arctic Empire','Paradise Music','Future Bass Records','Ophelia Records','Heaven Sent','SQUAD Nation','Nightblue Music','Spiration','Spiration Music','Recursive Recordings','Jupita','Noiseporn','Outertone','Bass Boost','Melodic Bassment Records','Bass Rebels Records','Starling EDM','MNTN Records','FeelQ Recordings','Legion Records','Frostfyre Records','Scan Records','FreeMusicWave','INVIBES Recordings','Protocol Recordings','Exuvium Records','Jade City Records','Atelier Records','Flight Zone Records','Euphonix Recordings','Simplify Recordings',
+    'Neoluminum','Reinelex Records','The Half Heart Project','Unbeyond Anthologies','Tonality','Oblivion Audio','Interval Audio','Full Flex Audio','Flexout Audio','Shuttle Recs','Frozen Fox Records','Mithril Records','Gravitas Recordings','Odyzey Music','HQThree Records','Kannibalen Records','Quality Goods Records','MorFlo Records','MONTA','NIGHTMODE','BREAK ROOM','broke','Sable Valley Records','DirtySnatcha Records','Basscapital Recs','A Records','High Caliber Records','Bad Medic Records','Cyclops Recordings','Sounds Of Mayhem','Subsidia','Bass Darkness','Antithesys Records','PRIMAL RECORDS','Seikatsu Records','Let Them Cook Records','Deadbeats','Bassrush','Bite This!','Beat Intelligence Network','Gud Vibrations','Trippy Bee Records',
+    'UKF','Pilot.','High Tea Music','Liquicity','DNBB Records','Hospital Records','Viper Recordings','Paperfunk Recordings','Delta9 Recordings','Automata Music','DnB Allstars Records','Symmetry Recordings','GLITCH.','RIOT RECORDS','Play Me Records','play:music','DnB Doctor.','Shogun Audio','Critical Music','Galacy Records','Souped Up Records','Neksus Sound','Gunsta Records','Delta9 Records','Soulvent Records','MODUS','Wobbles & Waffles',
+    'Monstercat','NCS','Seeking Blue','Seeking Blue Records','Lost In Dreams Records','bitbird','AVA Recordings','Circus Records','Thrive Music','This Never Happened','Enhanced','Anjunadeep','Anjunabeats','mau5trap','Armada','Meanwhile Recordings','Intensity Recordings','Edm Mania Recordings','Umpire Records','Solvana Records','frequency fifty six','Dim Mak','The MasterBeat Project','The MasterBeat Horizon','Blackout Music NL','Emotions Control Music','Overview Music','IN / ROTATION','Insomniac Records','FSOE','Confession','Black hole Recordings','Interstellar','Future Classic','Hypersia Records',
+    'UXN','Port Zero','More Bass More Good','Asahi Crew','Lunar Bass Records','MOTTO MUSIC','Ridmic','4 Jungle Records','Motive Hunter Audio','YANA Music','FRAKTVRED','Elephant Trunk','Salia Sounds','Kingdom Audio',
+    'West Cove Recordings','High Resistance','Serenadé Music','Sky Bass Records','LVLD Music','Mugic.us Records','Jadu Dala','DEEPNAS','Eons Away Label',
+    'HellCat Media','Light New Fires','Manifest','Futurized Records','IX Recorders','The QR Network','Drama Club Recordings'
+  ];
+
+  function getEl(id) { return document.getElementById(id); }
+  function logStatus(msg) {
+    const el = getEl('spBatchStatus');
+    if(el) el.textContent = msg;
+    console.log('[SpotifyEnhanced]', msg);
+  }
+  
+  window.toggleSpAuthMode = function() {
+    const mode = document.querySelector('input[name="spAuthMode"]:checked').value;
+    const box = getEl('spSecretBox');
+    if(box) box.style.display = (mode === 'client') ? 'block' : 'none';
+  };
+  
+  window.handleSpLogin = function() {
+    const mode = document.querySelector('input[name="spAuthMode"]:checked').value;
+    const clientId = getEl('spClientId').value.replace(/[^a-zA-Z0-9]/g, '');
+    if(!clientId) return alert('请输入 Client ID');
+    
+    try {
+       const s = JSON.parse(localStorage.getItem('netease-artist-feed-settings-v1') || '{}');
+       s.spClientId = clientId;
+       s.spAuthMode = mode;
+       if(mode === 'client') {
+          const secret = getEl('spClientSecret').value.replace(/[^a-zA-Z0-9]/g, '');
+          if(!secret) return alert('请输入 Client Secret');
+          s.spClientSecret = secret;
+          loginClientCredentials(clientId, secret);
+       } else {
+          loginPKCE(clientId);
+       }
+       localStorage.setItem('netease-artist-feed-settings-v1', JSON.stringify(s));
+    } catch(e) { console.error(e); }
+  };
+  
+  window.clearSpToken = function() {
+    spAccessToken = null;
+    localStorage.removeItem('spotify_user_token');
+    localStorage.removeItem('__spotifyToken');
+    localStorage.removeItem('spotify_user_token_expiry');
+    getEl('spTokenStatus').textContent = '未获取';
+    getEl('spTokenStatus').style.color = '#666';
+    getEl('btnSpLogin').style.display = 'inline-block';
+    alert('Token 已清除');
+  };
+
+  async function loginClientCredentials(id, secret) {
+     logStatus('正在获取 Client Credentials Token...');
+     try {
+         const creds = btoa(`${id}:${secret}`);
+         const res = await fetch(`${SP_PROXY}/spotify-token`, {
+             method: 'POST',
+             headers: {
+                 'Authorization': `Basic ${creds}`,
+                 'Content-Type': 'application/x-www-form-urlencoded'
+             },
+             body: 'grant_type=client_credentials'
+         });
+         
+         if (!res.ok) {
+             const txt = await res.text();
+             throw new Error(`HTTP ${res.status}: ${txt}`);
+         }
+         
+         const data = await res.json();
+         if (data.access_token) {
+            spAccessToken = data.access_token;
+            localStorage.setItem('spotify_user_token', data.access_token);
+            localStorage.setItem('__spotifyToken', data.access_token);
+            if (data.expires_in) {
+                localStorage.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
+            }
+            getEl('spTokenStatus').textContent = '✅ App Token 获取成功';
+            getEl('spTokenStatus').style.color = 'green';
+            getEl('btnSpLogin').style.display = 'none';
+            alert('App Token 获取成功 (Client Credentials 模式)!');
+         } else {
+             throw new Error('No access_token in response');
+         }
+     } catch (e) {
+         logStatus(`登录失败: ${e.message}`);
+         alert(`登录失败: ${e.message}\n请检查 Secret 是否正确，或代理是否运行。`);
+     }
+  }
+
+  function generateRandomString(length) {
+      const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let text = '';
+      for (let i = 0; i < length; i++) text += possible.charAt(Math.floor(Math.random() * possible.length));
+      return text;
+  }
+  async function generateCodeChallenge(codeVerifier) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(codeVerifier);
+      const digest = await window.crypto.subtle.digest('SHA-256', data);
+      return btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  
+  function loginPKCE(clientId) {
+      const verifier = generateRandomString(128);
+      generateCodeChallenge(verifier).then(challenge => {
+          sessionStorage.setItem('sp_pkce_verifier', verifier);
+          sessionStorage.setItem('sp_pkce_mode', 'true');
+          
+          // Fallback for app.js handling
+          localStorage.setItem('spotify_pkce_verifier', verifier);
+          localStorage.setItem('spotify_client_id_temp', clientId);
+          
+          const scope = 'user-read-private user-read-email';
+          const args = new URLSearchParams({
+              response_type: 'code', client_id: clientId, scope: scope,
+              redirect_uri: SP_REDIRECT_URI, code_challenge_method: 'S256', code_challenge: challenge
+          });
+          window.location.href = 'https://accounts.spotify.com/authorize?' + args.toString();
+      });
+  }
+  
+  async function checkPKCECallback() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const isPkce = sessionStorage.getItem('sp_pkce_mode');
+      
+      if (code && isPkce) {
+          sessionStorage.removeItem('sp_pkce_mode');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          const verifier = sessionStorage.getItem('sp_pkce_verifier');
+          const s = JSON.parse(localStorage.getItem('netease-artist-feed-settings-v1') || '{}');
+          const clientId = s.spClientId;
+          
+          if(!clientId || !verifier) return;
+
+          logStatus('正在交换 Token...');
+          try {
+              const body = new URLSearchParams({
+                  client_id: clientId, grant_type: 'authorization_code',
+                  code: code, redirect_uri: SP_REDIRECT_URI, code_verifier: verifier
+              });
+              const res = await fetch('https://accounts.spotify.com/api/token', {
+                  method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: body
+              });
+              
+              if(!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+              
+              const data = await res.json();
+              if (data.access_token) {
+                  spAccessToken = data.access_token;
+                  localStorage.setItem('spotify_user_token', data.access_token);
+                  localStorage.setItem('__spotifyToken', data.access_token);
+                  if (data.expires_in) {
+                      localStorage.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
+                  }
+                  
+                  // Clear fallback app.js vars
+                  localStorage.removeItem('spotify_pkce_verifier');
+                  localStorage.removeItem('spotify_client_id_temp');
+                  
+                  getEl('spTokenStatus').textContent = '✅ User Token 获取成功';
+                  getEl('spTokenStatus').style.color = 'green';
+                  getEl('btnSpLogin').style.display = 'none';
+                  alert('User Token 获取成功 (PKCE 模式)!');
+                  const dlg = getEl('settingsDialog');
+                  if(dlg && !dlg.open) dlg.showModal(); 
+              }
+          } catch(e) {
+              console.error(e);
+              alert('Token 交换失败: ' + e.message);
+          }
+      }
+  }
+
+    window.startSpBatchSearch = async function() {
+        if(!spAccessToken) {
+            // Try to load one more time just in case
+            spAccessToken = localStorage.getItem('spotify_user_token') || localStorage.getItem('__spotifyToken');
+            if(!spAccessToken) return alert('请先在设置中登录 Spotify (获取 Token)');
+        }
+        if(spIsSearching) return;
+
+        // 强制停止 app.js 中的背景扫描，避免两个扫描同时运行导致严重限流 (403/429)
+        window.__stopSpotifyAppScan = true;
+      
+      let dateStr = getEl('spBatchDate').value;
+      if(!dateStr) {
+          getEl('spBatchDate').valueAsDate = new Date();
+          dateStr = getEl('spBatchDate').value;
+      }
+      const range = parseInt(getEl('spBatchDays').value || '1');
+      
+      // Calculate Date Range
+        const targetDateObj = new Date(dateStr);
+        const validDates = new Set();
+        for (let i = -1; i < range; i++) { 
+            const d = new Date(targetDateObj);
+            d.setDate(d.getDate() - i);
+            validDates.add(d.toISOString().split('T')[0]);
+        }
+        
+        // Calculate Year query
+        const year = targetDateObj.getFullYear();
+        const prevYearObj = new Date(targetDateObj);
+        prevYearObj.setDate(prevYearObj.getDate() - (range + 1));
+        const yearQ = (prevYearObj.getFullYear() !== year) ? ` year:${prevYearObj.getFullYear()}-${year}` : ` year:${year}`;
+      
+      spIsSearching = true;
+      spResults = [];
+      getEl('btnSpBatchStart').disabled = true;
+      getEl('btnSpBatchStop').disabled = false;
+      getEl('btnSpBatchExport').disabled = true;
+      getEl('spBatchProgress').style.display = 'block';
+      
+      const feed = getEl('spotifyAutoFeed');
+    feed.innerHTML = '';
+    feed.className = 'feed'; // Use the same grid class as Netease cards // Apply Grid Class
+      
+      const labels = SP_DEFAULT_LABELS;
+      const total = labels.length;
+      let processed = 0;
+      
+      let failCount = 0;
+        
+        for(const label of labels) {
+            if(!spIsSearching) break;
+            processed++;
+            const pct = Math.round((processed / total) * 100);
+            const fill = getEl('spBatchFill');
+            if(fill) fill.style.width = pct + '%';
+            logStatus(`正在搜索 [${processed}/${total}]: ${label}...`);
+            
+            try {
+                const matchedItemsMap = new Map();
+                const keyLower = label.toLowerCase();
+                
+                // 1. Pagination: fetch up to 5 pages (50 items) to improve accuracy
+                const isRawQuery = /\b(label|year|tag|upc|isrc|genre|artist|album|track):/i.test(label);
+                let qVal;
+                if(isRawQuery) {
+                    qVal = /year:/i.test(label) ? label : `${label}${yearQ}`;
+                } else {
+                    qVal = `label:"${label}"${yearQ}`;
+                }
+                
+                // Check if user has token configured, else alert and stop
+                if(!spAccessToken) {
+                    alert('请先配置并获取 Token!');
+                    spIsSearching = false;
+                    break;
+                }
+                
+                let searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(qVal)}&type=album&market=US`; // Defaulting to US market
+                // We don't use 'limit' explicitly in the initial URL because of the Spotify bug we found earlier.
+                // We'll rely on the proxy/fetch function.
+                for(let offset = 0; offset < 50; offset += 10) {
+                    if(!spIsSearching) break;
+                    const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(qVal)}&type=album&limit=10&offset=${offset}&market=US`;
+                    const res = await fetchSpotifyWithRetry(url, spAccessToken);
+                    failCount = 0; // Reset on success
+                    
+                    if(res && res.albums && res.albums.items) {
+                        for(const item of res.albums.items) {
+                            if(!item.release_date) continue;
+                            
+                            const skipDateFilter = /\b(year|tag:new):/i.test(label);
+                            // Strict Date & Precision Check
+                            if (!skipDateFilter && item.release_date_precision !== 'day') continue;
+                            
+                            if(skipDateFilter || validDates.has(item.release_date)) {
+                                matchedItemsMap.set(item.id, item);
+                            }
+                        }
+                        if(res.albums.items.length < 10) break; // no more pages
+                    } else {
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 800));
+                }
+                
+                const candidateItems = Array.from(matchedItemsMap.values());
+                const finalItems = [];
+                
+                // 2. Fetch Full Details to strict match Label (batches of 20)
+                if(candidateItems.length > 0) {
+                    for(let i = 0; i < candidateItems.length; i += 20) {
+                        if(!spIsSearching) break;
+                        const chunk = candidateItems.slice(i, i + 20);
+                        const ids = chunk.map(x => x.id).join(',');
+                        const dUrl = `https://api.spotify.com/v1/albums?ids=${ids}&market=US`;
+                        
+                        try {
+                            const dRes = await fetchSpotifyWithRetry(dUrl, spAccessToken);
+                            if(dRes && dRes.albums) {
+                                for(const d of dRes.albums) {
+                                    if(!d) continue;
+                                    const dLabel = String(d.label || '').toLowerCase();
+                                    // Bidirectional includes for strict-ish matching (matches old app.js logic)
+                                    if(!isRawQuery && !dLabel.includes(keyLower) && !keyLower.includes(dLabel)) {
+                                        continue; // skip
+                                    }
+                                    finalItems.push(d);
+                                    spResults.push({ ...d, matchedLabel: label });
+                                }
+                            }
+                        } catch(e) {
+                            console.error('Details fetch error', e);
+                            if (e.message.includes('403') || e.message.includes('401')) {
+                                throw e; // Re-throw to trigger failCount and potentially stop
+                            }
+                        }
+                        await new Promise(r => setTimeout(r, 1500));
+                        if (!spIsSearching) break;
+                    }
+                }
+                
+                if (finalItems.length > 0) {
+                    for (const item of finalItems) {
+                        renderSpotifyItem(item, label);
+                    }
+                }
+            } catch(e) {
+                if (e.message === 'Stopped by user') break;
+                console.error(e);
+                failCount++;
+                if (failCount >= 3) {
+                    logStatus('连续发生严重错误或长期限流，自动停止扫描。请稍后重试或尝试更换网络/账号。');
+                    break;
+                }
+            }
+            // 增加默认请求间隔，防止频繁触发 429 或 403 WAF 拦截
+            let waitTime = 3000;
+            while(waitTime > 0 && spIsSearching) {
+                await new Promise(r => setTimeout(r, 500));
+                waitTime -= 500;
+            }
+        }
+      
+      spIsSearching = false;
+      getEl('btnSpBatchStart').disabled = false;
+      getEl('btnSpBatchStop').disabled = true;
+      getEl('btnSpBatchExport').disabled = false;
+      logStatus(`搜索完成。找到 ${spResults.length} 个新发行。`);
+  };
+  
+  window.stopSpBatchSearch = function() {
+      spIsSearching = false;
+      window.__stopSpotifyAppScan = true; // Also stop the scan from app.js if it's running
+      logStatus('正在停止...');
+  };
+  
+  window.showSpMockCard = function() {
+      const feed = getEl('spotifyAutoFeed');
+      if(feed.querySelector('.empty')) feed.innerHTML = '';
+      feed.className = 'feed'; // Ensure it uses the main grid layout from styles.css
+      
+      const mockItem = {
+          name: "测试专辑: 虚拟现实 " + Math.floor(Math.random()*100),
+          artists: [{name: "Said The Sky"}, {name: "Illenium"}],
+          release_date: new Date().toISOString().split('T')[0],
+          images: [{url: "https://i.scdn.co/image/ab67616d0000b2734121fa0f24e9b9803859d0fc"}],
+          external_urls: {spotify: "#"},
+          label: "Spiration Music"
+      };
+      renderSpotifyItem(mockItem, "Spiration Music");
+      logStatus("已生成测试卡片，供预览样式。");
+  };
+  
+  window.exportSpBatchResults = function() {
+      if(!spResults.length) return alert('没有数据可导出');
+      let csv = '\uFEFFLabel,Artist,Album,Type,Date,Link\\n';
+      spResults.forEach(item => {
+          const artists = item.artists.map(a => a.name).join(' / ');
+          csv += `"${item.matchedLabel}","${artists}","${item.name}","${item.album_type}","${item.release_date}","${item.external_urls.spotify}"\\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `spotify_batch_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+  };
+  
+  async function fetchSpotifyWithRetry(url, token) {
+      let retries = 0;
+      // Rewrite URL to use proxy format: https://api.spotify.com/v1/X -> http://127.0.0.1:8012/spotify-api/X
+      let targetUrl = url;
+      if (url.includes('api.spotify.com/v1/')) {
+          targetUrl = url.replace('https://api.spotify.com/v1/', `${SP_PROXY}/spotify-api/`);
+      }
+      
+      while(retries < 6) {
+          try {
+              const res = await fetch(targetUrl, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+              });
+              
+              if(res.status === 429) {
+                  let retryAfter = parseInt(res.headers.get('Retry-After'));
+                  if (isNaN(retryAfter) || retryAfter <= 0) {
+                      retryAfter = 10 + retries * 10; // Default scaling wait if header missing
+                  }
+                  // Exponential backoff: retryAfter + 2^retries * 2s
+                  const backoff = (retryAfter * 1000) + (Math.pow(2, retries) * 2000);
+                  logStatus(`Rate Limit 429! 账号被限流，等待 ${Math.ceil(backoff/1000)}s...`);
+                  
+                  // Wait but allow interruption
+                  let waitTime = backoff;
+                  while(waitTime > 0) {
+                      if (!spIsSearching) throw new Error('Stopped by user');
+                      await new Promise(r => setTimeout(r, 1000));
+                      waitTime -= 1000;
+                  }
+                  
+                  retries++;
+                  continue;
+              }
+              
+              if(!res.ok) {
+                 const txt = await res.text();
+                 try {
+                    const errJson = JSON.parse(txt);
+                    if(errJson.error && errJson.error.message) {
+                        console.warn(`Spotify API Error: ${errJson.error.message}`);
+                    }
+                 } catch(e){}
+                 
+                 // If 403 or 401, token might be invalid or IP hard blocked
+                 if (res.status === 403 || res.status === 401) {
+                     logStatus(`API Error ${res.status}: 授权失败或 IP 被短期封禁(请求过快)。请停止扫描，等待几分钟或更换代理节点后再试。`);
+                     throw new Error(`HTTP ${res.status}`);
+                 }
+                 
+                 // Retry on 5xx errors
+                 if (res.status >= 500) {
+                     await new Promise(r => setTimeout(r, 2000));
+                     retries++;
+                     continue;
+                 }
+                 
+                 throw new Error(`HTTP ${res.status}`);
+              }
+              return await res.json();
+          } catch(e) {
+              if(e.message.includes('429') || e.message.includes('50')) { /* handled */ }
+              else {
+                  console.warn('Fetch error:', e);
+                  throw e; // Throw so the main loop can handle fatal errors
+              }
+          }
+      }
+      throw new Error('Rate limit retries exhausted');
+  }
+  
+  function renderSpotifyItem(item, label) {
+      if (!item) return;
+      const feed = getEl('spotifyAutoFeed');
+      
+      const imgUrl = (item.images && item.images.length > 0) ? item.images[0].url : '';
+      const artists = item.artists.map(a => a.name).join(', ');
+      // Detailed fetch returns the actual label, so we use it if available, else fallback to query label
+      const labelText = item.label || label || 'Label Hidden';
+      
+      const article = document.createElement('article');
+      article.className = 'card spotify-card-netease';
+      article.innerHTML = `
+        <div class="cover">
+          ${imgUrl ? `<img src="${imgUrl}" alt="${item.name}" loading="lazy" />` : ''}
+        </div>
+        <div class="meta">
+          <div class="title" title="${item.name}">${item.name}</div>
+          <div class="artist" title="${artists}">${artists}</div>
+          <div class="date">发布日期：${item.release_date}</div>
+          <div class="label">厂牌：${labelText}</div>
+          <div class="links" style="margin-top: 12px;">
+            <a class="pill" href="${item.external_urls.spotify}" target="_blank" rel="noopener">打开 Spotify</a>
+          </div>
+        </div>
+      `;
+      feed.appendChild(article);
+  }
+
+  window.addEventListener('load', async () => {
+     try {
+         const s = JSON.parse(localStorage.getItem('netease-artist-feed-settings-v1') || '{}');
+         if(s.spClientId) getEl('spClientId').value = s.spClientId;
+         if(s.spClientSecret) getEl('spClientSecret').value = s.spClientSecret;
+         if(s.spAuthMode) {
+             const rad = document.querySelector('input[name="spAuthMode"][value="' + s.spAuthMode + '"]');
+             if(rad) {
+                 rad.checked = true;
+                 toggleSpAuthMode();
+             }
+         }
+         getEl('spBatchDate').valueAsDate = new Date();
+         
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const verifier = localStorage.getItem('spotify_pkce_verifier');
+        const clientId = localStorage.getItem('spotify_client_id_temp') || spClientId;
+
+        // Ensure this fallback logic only runs if checkPKCECallback hasn't handled it
+        if (code && verifier && clientId && !sessionStorage.getItem('sp_pkce_mode')) {
+            // Remove code from URL to prevent infinite loops
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            getEl('spTokenStatus').textContent = '交换 Token 中...';
+            getEl('spTokenStatus').style.color = 'orange';
+
+            try {
+                // Determine Canonical Redirect URI
+                let path = window.location.pathname;
+                if(path === '/' || path === '') path = '/index-enhanced.html';
+                const redirectUri = `http://127.0.0.1${window.location.port ? `:${window.location.port}` : ''}${path}`;
+
+                const body = new URLSearchParams({
+                    client_id: clientId,
+                    grant_type: 'authorization_code',
+                    code: code,
+                    redirect_uri: redirectUri,
+                    code_verifier: verifier
+                });
+
+                const res = await fetch('https://accounts.spotify.com/api/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body
+                });
+
+                if(!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+                const data = await res.json();
+                if (data.access_token) {
+                    spAccessToken = data.access_token;
+                    localStorage.setItem('spotify_user_token', data.access_token);
+                    localStorage.setItem('__spotifyToken', data.access_token);
+                    if (data.expires_in) {
+                        localStorage.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
+                    }
+                    if (data.refresh_token) {
+                        localStorage.setItem('spotify_refresh_token', data.refresh_token);
+                    }
+
+                    // Clean up PKCE items
+                    localStorage.removeItem('spotify_pkce_verifier');
+                    localStorage.removeItem('spotify_client_id_temp');
+
+                    getEl('spTokenStatus').textContent = '✅ Token 已配置 (PKCE)';
+                    getEl('spTokenStatus').style.color = 'green';
+                    getEl('btnSpLogin').style.display = 'none';
+                    alert('User Token 获取成功 (PKCE)!');
+                }
+            } catch(e) {
+                console.error(e);
+                getEl('spTokenStatus').textContent = 'Token 交换失败';
+                getEl('spTokenStatus').style.color = 'red';
+                alert('Token 交换失败: ' + e.message);
+            }
+            return;
+        }
+
+         const token = localStorage.getItem('spotify_user_token') || localStorage.getItem('__spotifyToken');
+         const expiry = localStorage.getItem('spotify_user_token_expiry');
+         if (token) {
+             const isExpired = expiry && Date.now() > Number(expiry);
+             if (!isExpired) {
+                 spAccessToken = token;
+                 getEl('spTokenStatus').textContent = '✅ Token 已配置';
+                 getEl('spTokenStatus').style.color = 'green';
+                 getEl('btnSpLogin').style.display = 'none';
+             } else {
+                 getEl('spTokenStatus').textContent = '⚠️ Token 已过期';
+                 getEl('spTokenStatus').style.color = 'red';
+                 getEl('btnSpLogin').style.display = 'inline-block';
+             }
+         } else {
+             getEl('spTokenStatus').textContent = '未配置';
+             getEl('spTokenStatus').style.color = '#666';
+             getEl('btnSpLogin').style.display = 'inline-block';
+         }
+     } catch(e){}
+     checkPKCECallback();
+  });
+
+})();
+</script>
+</body>
+<style>
+/* 简易进度条样式（仅增强版使用） */
+.progress { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.progress .fill { height: 100%; background: linear-gradient(90deg,#4caf50,#2196f3); width: 0%; transition: width 0.2s ease; }
+ /* 试听控件样式 */
+ .preview-controls{margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+ .preview-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;}
+ .preview-progress{display:flex;align-items:center;gap:8px;min-width:160px;flex:1 1 180px;}
+ .preview-bar{position:relative;height:6px;background:#eee;border-radius:4px;overflow:hidden;width:auto;flex:1 1 140px;}
+ .preview-fill{position:absolute;left:0;top:0;height:100%;background:#4caf50;width:0%;}
+ .preview-time{font-variant-numeric:tabular-nums;color:#666;font-size:12px;}
+ .preview-pill{padding:4px 10px;font-size:13px}
+
+/* Spotify Netease-like Card Styles */
+.spotify-card-netease {
+    font-family: 'Spotify Mix', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.spotify-card-netease .cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.spotify-card-netease .pill {
+    background: #1db954;
+    color: #fff;
+    border: none;
+    padding: 6px 16px;
+    border-radius: 99px;
+    font-size: 13px;
+    font-weight: bold;
+    text-decoration: none;
+    display: inline-block;
+    transition: background 0.2s;
+}
+.spotify-card-netease .pill:hover {
+    background: #1ed760;
+}
+.spotify-card-netease .label {
+    background: rgba(29, 185, 84, 0.1);
+    color: #1db954;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 12px;
+    display: inline-block;
+    margin-top: 6px;
+}
+</style>
+</html>
