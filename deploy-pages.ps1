@@ -100,11 +100,22 @@ try {
   if ([string]::IsNullOrWhiteSpace($msg)) { $msg = "Deploy $ghRepo to Pages" }
   Write-Host "[3/4] Committing with message: $msg"
   $rc = Run-Git @('commit','-q','-m',$msg)
+  $hasAnyCommit = $false
+  try {
+    $tmpEA = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $out = & git rev-parse --verify -q HEAD 2>$null
+    if ($LASTEXITCODE -eq 0 -and $out) { $hasAnyCommit = $true }
+    $ErrorActionPreference = $tmpEA
+  } catch {}
   if ($rc -ne 0) {
-    Write-Host -ForegroundColor Yellow "  commit returned non-zero. This often means:"
-    Write-Host -ForegroundColor Yellow "   - nothing changed since last commit (safe to continue); OR"
-    Write-Host -ForegroundColor Yellow "   - Author identity was just auto-set above (if so, RE-RUN this bat again)."
-    Write-Host -ForegroundColor Yellow "  See the 'git> commit ...' line above for details."
+    if (-not $hasAnyCommit) {
+      Write-Host "  commit rc=$rc and repo has zero commits; retrying with --allow-empty to ensure first push succeeds ..."
+      $rc2 = Run-Git @('commit','--allow-empty','-q','-m',$msg)
+      if ($rc2 -ne 0) { Stop-AndWait "commit (--allow-empty) failed - cannot push without at least one commit. Fix the git> commit lines above and retry.`n  The most common fix is to run the script one more time after identity was saved." }
+    } else {
+      Write-Host -ForegroundColor Yellow "  commit rc=$rc but repo already has at least 1 commit (safe to push; nothing new this run)."
+    }
   }
 
   Write-Host "[4/4] Pushing to origin/gh-pages ..."
