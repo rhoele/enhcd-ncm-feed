@@ -1,44 +1,44 @@
 {
-  "updated_at": "2026-10-15T17:30:57.814Z",
+  "updated_at": "2026-10-15T17:36:16.366Z",
   "latest_date": "2026-10-16",
   "days": 7,
-  "artist_count": 9608,
-  "album_count": 345302,
+  "artist_count": 300,
+  "album_count": 20858,
   "dates": [
     {
       "date": "2026-10-16",
-      "count": 428,
-      "generated_at": "2026-10-15T17:30:57.814Z"
+      "count": 24,
+      "generated_at": "2026-10-15T17:36:16.366Z"
     },
     {
       "date": "2026-10-15",
-      "count": 116,
-      "generated_at": "2026-10-15T17:30:57.814Z"
+      "count": 4,
+      "generated_at": "2026-10-15T17:36:16.366Z"
     },
     {
       "date": "2026-10-14",
-      "count": 68,
-      "generated_at": "2026-10-15T17:30:57.814Z"
+      "count": 2,
+      "generated_at": "2026-10-15T17:36:16.366Z"
     },
     {
       "date": "2026-10-13",
-      "count": 54,
-      "generated_at": "2026-10-15T17:30:57.814Z"
+      "count": 1,
+      "generated_at": "2026-10-15T17:36:16.366Z"
     },
     {
       "date": "2026-10-12",
-      "count": 40,
-      "generated_at": "2026-10-15T17:30:57.814Z"
+      "count": 1,
+      "generated_at": "2026-10-15T17:36:16.366Z"
     },
     {
       "date": "2026-10-11",
-      "count": 30,
-      "generated_at": "2026-10-15T17:30:57.814Z"
+      "count": 3,
+      "generated_at": "2026-10-15T17:36:16.366Z"
     },
     {
       "date": "2026-10-10",
-      "count": 50,
-      "generated_at": "2026-10-15T17:30:57.814Z"
+      "count": 1,
+      "generated_at": "2026-10-15T17:36:16.366Z"
     }
   ]
 }
