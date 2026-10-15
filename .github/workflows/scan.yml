@@ -1,0 +1,94 @@
+name: 云端扫描新作（移动端静态快照）
+
+# 逐艺人调用 /artist/album 抓取近 7 天新作，产出 data/mobile/ 静态快照并提交回 gh-pages。
+# 移动端只读这些同源 JSON，彻底规避「HTTPS 页面请求 http:// 本地后端」的混合内容拦截。
+#
+# 注意：GitHub Actions 的 cron 使用 UTC，且为 best-effort（高峰期常延迟 5~30 分钟）。
+# 下面所有 cron 已换算为北京时间 = UTC + 8。
+
+on:
+  schedule:
+    # 北京时间 00:05 / 00:25 / 00:45（= 前一天 UTC 16:05/16:25/16:45）—— 过零点密集出结果
+    - cron: '5,25,45 16 * * *'
+    # 北京时间 01:05（= UTC 17:05）
+    - cron: '5 17 * * *'
+    # 北京时间 02:00 / 04:00 / 06:00（= 前一天 UTC 18:00/20:00/22:00）
+    - cron: '0 18,20,22 * * *'
+    # 北京时间 08:00 ~ 22:00 每 2 小时（= UTC 00:00 ~ 14:00 每 2 小时）
+    - cron: '0 0,2,4,6,8,10,12,14 * * *'
+  workflow_dispatch:
+    inputs:
+      max_artists:
+        description: '只扫描前 N 个艺人（试跑用，0 = 全部 9608 个）'
+        required: false
+        default: '0'
+      concurrency:
+        description: '并发数（默认 6）'
+        required: false
+        default: '6'
+
+permissions:
+  contents: write
+
+# 同一时间只跑一个扫描任务，避免两个 job 同时改快照后推冲突
+concurrency:
+  group: cloud-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: 拉取 gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 启动网易云 API 服务
+        env:
+          PORT: '3100'
+        run: |
+          npx -y NeteaseCloudMusicApi@4.32.0 > /tmp/ncm-api.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf "http://127.0.0.1:3100/album/new?area=ALL&limit=1" > /dev/null; then
+              echo "NeteaseCloudMusicApi 已就绪（${i}0s 内）"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::网易云 API 启动超时"
+          tail -n 40 /tmp/ncm-api.log
+          exit 1
+
+      - name: 逐艺人扫描并生成快照
+        env:
+          # 可选：在仓库 Settings → Secrets 里配置 NETEASE_MUSIC_U 可提升稳定性；
+          # 未配置时以匿名身份扫描（/artist/album 匿名可用）。
+          NAF_NCM_COOKIE: ${{ secrets.NETEASE_MUSIC_U }}
+        run: |
+          node scripts/cloud-scan.js \
+            --out . \
+            --api http://127.0.0.1:3100 \
+            --days 7 \
+            --concurrency "${{ github.event.inputs.concurrency || 6 }}" \
+            --max-artists "${{ github.event.inputs.max_artists || 0 }}"
+
+      - name: 提交快照
+        run: |
+          git config user.name  "naf-scan-bot"
+          git config user.email "naf-scan-bot@users.noreply.github.com"
+          git add data/mobile
+          if git diff --cached --quiet; then
+            echo "快照无变化，跳过提交"
+            exit 0
+          fi
+          git commit -m "chore(snapshot): 云端扫描 $(TZ=Asia/Shanghai date +'%Y-%m-%d %H:%M')"
+          # 本机可能同时推送过，先 rebase 再推，避免 non-fast-forward
+          git pull --rebase --autostash origin gh-pages || true
+          git push origin gh-pages
