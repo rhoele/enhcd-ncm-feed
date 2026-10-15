@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 /**
- * [部署副本] 源文件：c:\netease-artist-feed\scripts\cloud-scan.js
- * 改动请同步回源文件，避免与本地项目里的 lib/mobile-snapshot.js 格式漂移。
- *
  * cloud-scan.js
  *
  * 云端（GitHub Actions）逐艺人扫描，产出与本地 export-mobile-snapshot.js 完全同构的
@@ -26,6 +23,7 @@ const {
   createCollector,
   writeSnapshot,
   readArtistIds,
+  loadExistingInto,
   ARTISTS_FILE
 } = require('./lib/mobile-snapshot');
 
@@ -46,11 +44,20 @@ const ALBUM_LIMIT = Math.max(1, Math.min(200, parseInt(pickArg('--limit', '100')
 const MAX_ARTISTS = Math.max(0, parseInt(pickArg('--max-artists', '0'), 10) || 0);
 const TIMEOUT_MS = Math.max(3000, parseInt(pickArg('--timeout', '15000'), 10) || 15000);
 const COOKIE = pickArg('--cookie', process.env.NAF_NCM_COOKIE || '');
-const PRUNE = !args.includes('--keep-old');
+// 部分扫描（--max-artists > 0，试跑用）不能代表全量结果：
+//   1) 必须合并已有快照，否则会把线上完整数据冲成一小撮
+//   2) 必须关闭清理，否则没扫到的日期文件会被删掉
+const PARTIAL = MAX_ARTISTS > 0;
+const MERGE = PARTIAL || args.includes('--merge');
+const PRUNE = !PARTIAL && !args.includes('--keep-old');
 const ENRICH = !args.includes('--no-enrich');
 const ARTISTS_FILE_PATH = path.resolve(pickArg('--artists', path.join(DST_MOBILE_DIR, ARTISTS_FILE)));
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function readPrevIndex() {
+  try { return JSON.parse(fs.readFileSync(path.join(DST_MOBILE_DIR, 'index.json'), 'utf8')); } catch { return null; }
+}
 
 async function fetchArtistAlbums(artistId) {
   const url = new URL(API + '/artist/album');
@@ -156,6 +163,14 @@ async function enrichCompanies(collector) {
   console.log('  Cookie     : ' + (COOKIE ? '已提供' : '无（匿名）'));
 
   const collector = createCollector(DAYS);
+
+  // 已有快照先读进来（部分扫描时避免抹掉线上数据）
+  let merged = 0;
+  if (MERGE) {
+    merged = loadExistingInto(DST_MOBILE_DIR, collector);
+    console.log('  已合并现有快照条目：' + merged + ' 条');
+  }
+
   let done = 0;
   let okCount = 0;
   let failCount = 0;
@@ -205,16 +220,19 @@ async function enrichCompanies(collector) {
   }
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+  // 部分扫描时沿用旧的统计数（否则页头会出现「已扫描 300 个艺人」这种误导数字）
+  const prevIndex = PARTIAL ? readPrevIndex() : null;
   const { indexDates, indexPayload, pruned } = writeSnapshot({
     dstMobileDir: DST_MOBILE_DIR,
     collector,
     days: DAYS,
-    artistCount: targets.length,
-    albumCount: albumSeen,
+    artistCount: Math.max(targets.length, Number(prevIndex?.artist_count) || 0),
+    albumCount: Math.max(albumSeen, Number(prevIndex?.album_count) || 0),
     prune: PRUNE
   });
 
   console.log('\n云端扫描完成，用时 ' + elapsed + 's');
+  if (MERGE) console.log('  合并已有条目 ' + merged + ' 条' + (PARTIAL ? '（部分扫描模式，不清理旧快照）' : ''));
   console.log('  成功 ' + okCount + ' / 失败 ' + failCount + '，抓取专辑 ' + albumSeen + ' 张');
   console.log('  命中近 ' + DAYS + ' 天新作 ' + collector.hitCount + ' 张');
   for (const d of indexDates) console.log('    ' + d.date + ' → ' + d.count + ' 条');

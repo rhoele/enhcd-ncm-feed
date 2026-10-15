@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 /**
- * [部署副本] 源文件：c:\netease-artist-feed\scripts\lib\mobile-snapshot.js
- * 改动请同步回源文件，避免与本地项目里的 export-mobile-snapshot.js 格式漂移。
- *
  * mobile-snapshot.js —— 移动端静态快照的公共构建 / 写出逻辑。
  *
  * 被两个生产者复用，保证 data/mobile/ 输出结构完全一致（前端只认这一套格式）：
@@ -46,6 +43,21 @@ function createCollector(days) {
     wanted: new Set(recentDayList(days)),
     byDay: new Map(), // day -> Map(albumId -> item)
     hitCount: 0,
+
+    /** 直接放入一条已构建好的条目（用于合并已有快照） */
+    seed(item) {
+      const albumId = Number(item && item.id) || 0;
+      const ts = Number(item && item.publishTime) || 0;
+      if (!albumId || !ts) return false;
+      const day = beijingDayKey(ts);
+      if (!self.wanted.has(day)) return false;
+      if (!self.byDay.has(day)) self.byDay.set(day, new Map());
+      const bucket = self.byDay.get(day);
+      if (bucket.has(albumId)) return false;
+      bucket.set(albumId, item);
+      self.hitCount += 1;
+      return true;
+    },
 
     /** @returns {boolean} 本次是否新收录 */
     add(album, artistId, company) {
@@ -156,6 +168,24 @@ function writeArtistIds(dstMobileDir, ids) {
   return payload;
 }
 
+/** 读取已有的单日快照，合并进收集器（用于部分扫描时不抹掉线上已有数据） */
+function loadExistingInto(dstMobileDir, collector) {
+  let merged = 0;
+  if (!fs.existsSync(dstMobileDir)) return merged;
+  for (const day of collector.wanted) {
+    const file = path.join(dstMobileDir, day + '.json');
+    if (!fs.existsSync(file)) continue;
+    let payload = null;
+    try { payload = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { continue; }
+    const items = Array.isArray(payload) ? payload : (payload && payload.items);
+    if (!Array.isArray(items)) continue;
+    for (const item of items) {
+      if (collector.seed(item)) merged += 1;
+    }
+  }
+  return merged;
+}
+
 /** 读取艺人清单，兼容 {ids:[]} 与裸数组两种写法 */
 function readArtistIds(file) {
   if (!fs.existsSync(file)) return null;
@@ -180,5 +210,6 @@ module.exports = {
   createCollector,
   writeSnapshot,
   writeArtistIds,
-  readArtistIds
+  readArtistIds,
+  loadExistingInto
 };
