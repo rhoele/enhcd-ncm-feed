@@ -42,7 +42,7 @@
   // Sync cache to napcat bot automatically on load
   try {
     const cache = localStorage.getItem('netease-follow-cache-v1');
-    if (cache) {
+    if (cache && !__isStaticMode()) {
       const syncUrl = typeof resolveCorsProxyApi === 'function'
         ? resolveCorsProxyApi('/sync-cache')
         : 'http://127.0.0.1:8012/sync-cache';
@@ -69,6 +69,23 @@
   function __trimBase(s) {
     const v = String(s || '').trim().replace(/\/+$/, '');
     return v || '';
+  }
+  // ===== 静态快照模式 =====
+  // 部署在 GitHub Pages 等无后端环境时（非本机源），只读 data/mobile/ 下的静态快照，
+  // 彻底避开 HTTPS 页面请求 http:// 的混合内容拦截与 127.0.0.1 指向自身的坑。
+  function __isStaticMode() {
+    if (typeof window.__NAF_STATIC_MODE__ === 'boolean') return window.__NAF_STATIC_MODE__;
+    // 本机源（127.0.0.1 / localhost）始终走实时扫描
+    if (__isLocalSameOrigin(null)) return false;
+    const seed = window.NAF_SEED_SETTINGS || null;
+    return !!(seed && seed.staticMode === true);
+  }
+  function __getStaticSnapshotBase() {
+    try {
+      const seed = window.NAF_SEED_SETTINGS || null;
+      if (seed && seed.staticSnapshotBase) return __trimBase(seed.staticSnapshotBase);
+    } catch {}
+    return 'data/mobile';
   }
   function getScanBackendBase() {
     try {
@@ -2435,7 +2452,63 @@
     }, 10000);
   }
 
+  // ===== 静态快照渲染：从 data/mobile/ 读取已抓取好的结果（只读） =====
+  async function __renderStaticSnapshot(){
+    const statusEl = document.getElementById('progressText') || document.getElementById('loadingText');
+    const base = __getStaticSnapshotBase();
+    try{
+      if(statusEl) statusEl.textContent = '正在读取云端快照…';
+      const idxRes = await fetch(base + '/index.json', { cache: 'no-store' });
+      if(!idxRes.ok) throw new Error('index.json HTTP ' + idxRes.status);
+      const idx = await idxRes.json();
+      const days = Array.isArray(idx?.dates) ? idx.dates.map(d => String(d?.date || '')).filter(Boolean) : [];
+      if(!days.length) throw new Error('快照索引为空');
+      const day = days[0];
+      const dayRes = await fetch(base + '/' + day + '.json', { cache: 'no-store' });
+      if(!dayRes.ok) throw new Error(day + '.json HTTP ' + dayRes.status);
+      const payload = await dayRes.json();
+      const items = normalizeEnhancedBackendResults(Array.isArray(payload) ? payload : payload?.items);
+
+      const cfg = loadSettings();
+      const baseDate = (cfg.targetDate ? new Date(cfg.targetDate) : new Date());
+      baseDate.setHours(0,0,0,0);
+      const rangedKey = buildEnhancedRangeCacheKey(baseDate, cfg.daysRange);
+
+      __enhancedUiState.rangeCacheKey = rangedKey;
+      setEnhancedItemsByTab(ENHANCED_TAB_NEW, items.filter(item => classifyEnhancedItem(item) === ENHANCED_TAB_NEW));
+      setEnhancedItemsByTab(ENHANCED_TAB_COMPILATION, items.filter(item => classifyEnhancedItem(item) === ENHANCED_TAB_COMPILATION));
+      __enhancedRenderedKeys = new Set(items.map(item => getEnhancedRenderKey(item)));
+      updateEnhancedHeaderStats({
+        artistsText: String(idx?.artist_count || 0),
+        hitsText: String(items.reduce((sum, item) => sum + Number(item?.trackCount || 0), 0)),
+        albumsText: String(items.length),
+        checkedAlbumsText: String(idx?.album_count || 0),
+        elapsedText: '快照'
+      }, false);
+
+      if(items.length){
+        renderEnhancedPanelsFromState();
+        activateEnhancedTab(__enhancedUiState.activeTab, { preserveCurrentScroll: false, restoreScroll: false });
+        persistEnhancedUiState();
+        try{ localStorage.setItem(rangedKey, JSON.stringify(items)); }catch{}
+        if(statusEl) statusEl.textContent = `云端快照 ${day} · ${items.length} 张（只读模式）`;
+      } else {
+        renderFeedSection(ENHANCED_TAB_NEW, [], `${day} 快照中未发现新作。`);
+        renderFeedSection(ENHANCED_TAB_COMPILATION, [], getEnhancedEmptyMessage(ENHANCED_TAB_COMPILATION, 'empty'));
+        if(statusEl) statusEl.textContent = `云端快照 ${day} · 暂无新作`;
+      }
+    }catch(err){
+      if(statusEl) statusEl.textContent = '快照读取失败：' + (err?.message || err);
+      console.warn('[StaticSnapshot] 读取失败', err);
+    }
+  }
+
   async function runDailyCheck(){
+    // GitHub Pages 等无后端环境：改用静态快照，不再发起任何后端请求
+    if(__isStaticMode()){
+      await __renderStaticSnapshot();
+      return;
+    }
     const nowTs = Date.now();
     if(nowTs - __lastRunTime < 5000){
         console.warn('Skipping runDailyCheck (debounced)');
