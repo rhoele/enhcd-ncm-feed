@@ -3,10 +3,11 @@
   // ===== Seed 默认值注入（部署到 Pages 时，把当前用户的 Cookie/设置/艺人缓存 打包成默认值） =====
   try {
     (function __applySeed() {
+      if (window.NAF_PUBLIC_MODE) return;
       if (!window.NAF_SEED_SETTINGS || typeof window.NAF_SEED_SETTINGS !== 'object') return;
       const seed = window.NAF_SEED_SETTINGS;
       const LS_KEY_FORCE = seed.__lsKey || 'netease-feed-settings-v1';
-      const currentRaw = localStorage.getItem(LS_KEY_FORCE);
+      const currentRaw = window.NAF_STORAGE.getItem(LS_KEY_FORCE);
       let shouldApply = false;
       if (!currentRaw) shouldApply = true;
       if (typeof seed.__seedVersion !== 'undefined' && typeof seed.__seedVersion === 'number') {
@@ -21,7 +22,7 @@
       const merged = Object.assign({}, seed);
       delete merged.__lsKey; delete merged.__force;
       const text = JSON.stringify(merged);
-      try { localStorage.setItem(LS_KEY_FORCE, text); } catch {}
+      try { window.NAF_STORAGE.setItem(LS_KEY_FORCE, text); } catch {}
       // 同时写入 Cookie 备份，跨同源不同端口时能迁移
       try {
         const DAYS180 = 180 * 86400 * 1000;
@@ -30,18 +31,18 @@
       } catch {}
       // seed 里附了 follow cache 一并写入
       if (seed.__followCache && typeof seed.__followCache === 'object') {
-        try { localStorage.setItem('netease-follow-cache-v1', JSON.stringify(seed.__followCache)); } catch {}
+        try { window.NAF_STORAGE.setItem('netease-follow-cache-v1', JSON.stringify(seed.__followCache)); } catch {}
       }
       // seed 里附了 artist check cache
       if (seed.__artistCheckCache && typeof seed.__artistCheckCache === 'object') {
-        try { localStorage.setItem('netease-artist-check-cache-v2', JSON.stringify(seed.__artistCheckCache)); } catch {}
+        try { window.NAF_STORAGE.setItem('netease-artist-check-cache-v2', JSON.stringify(seed.__artistCheckCache)); } catch {}
       }
     })();
   } catch {}
 
   // Sync cache to napcat bot automatically on load
   try {
-    const cache = localStorage.getItem('netease-follow-cache-v1');
+    const cache = window.NAF_STORAGE.getItem('netease-follow-cache-v1');
     if (cache && !__isStaticMode()) {
       const syncUrl = typeof resolveCorsProxyApi === 'function'
         ? resolveCorsProxyApi('/sync-cache')
@@ -74,6 +75,7 @@
   // 部署在 GitHub Pages 等无后端环境时（非本机源），只读 data/mobile/ 下的静态快照，
   // 彻底避开 HTTPS 页面请求 http:// 的混合内容拦截与 127.0.0.1 指向自身的坑。
   function __isStaticMode() {
+    if (window.NAF_PUBLIC_MODE) return !window.NAF_PERSONAL_MODE;
     if (typeof window.__NAF_STATIC_MODE__ === 'boolean') return window.__NAF_STATIC_MODE__;
     // 本机源（127.0.0.1 / localhost）始终走实时扫描
     if (__isLocalSameOrigin(null)) return false;
@@ -234,7 +236,7 @@
         // ensure settings are available
         const s = loadSettings ? loadSettings() : {}; 
         
-        const codeVerifier = localStorage.getItem('spotify_pkce_verifier');
+        const codeVerifier = window.NAF_STORAGE.getItem('spotify_pkce_verifier');
         if(!codeVerifier){
              // Maybe legacy flow or error? Let other scripts handle it (like index-enhanced.html)
              return;
@@ -243,7 +245,7 @@
         // Clear query params to avoid re-execution only if we are handling it
         window.history.replaceState({}, document.title, window.location.pathname);
         
-        const clientId = s.spotifyClientId || localStorage.getItem('spotify_client_id_temp');
+        const clientId = s.spotifyClientId || window.NAF_STORAGE.getItem('spotify_client_id_temp');
         if(!clientId){
             alert('Spotify 登录失败：无法获取 Client ID。');
             return;
@@ -276,16 +278,16 @@
             
             const data = await res.json();
             if(data.access_token){
-                localStorage.setItem('spotify_user_token', data.access_token);
+                window.NAF_STORAGE.setItem('spotify_user_token', data.access_token);
                 const expiry = Date.now() + (data.expires_in * 1000);
-                localStorage.setItem('spotify_user_token_expiry', expiry);
+                window.NAF_STORAGE.setItem('spotify_user_token_expiry', expiry);
                 if(data.refresh_token){
-                     localStorage.setItem('spotify_refresh_token', data.refresh_token);
+                     window.NAF_STORAGE.setItem('spotify_refresh_token', data.refresh_token);
                 }
                 
                 // Clean up
-                localStorage.removeItem('spotify_pkce_verifier');
-                localStorage.removeItem('spotify_client_id_temp');
+                window.NAF_STORAGE.removeItem('spotify_pkce_verifier');
+                window.NAF_STORAGE.removeItem('spotify_client_id_temp');
                 
                 alert('Spotify 登录成功！(PKCE Flow)');
                 // Refresh UI if settings dialog is open
@@ -304,8 +306,8 @@
       const token = params.get('access_token');
       const expiresIn = params.get('expires_in');
       if(token){
-        localStorage.setItem('spotify_user_token', token);
-        localStorage.setItem('spotify_user_token_expiry', Date.now() + (Number(expiresIn) * 1000));
+        window.NAF_STORAGE.setItem('spotify_user_token', token);
+        window.NAF_STORAGE.setItem('spotify_user_token_expiry', Date.now() + (Number(expiresIn) * 1000));
         window.location.hash = '';
         setTimeout(() => alert('Spotify 登录成功！已保存 User Token，现在您可以尝试搜索厂牌了。'), 500);
       }
@@ -316,9 +318,11 @@
   const LS_KEY = 'netease-feed-settings-v1';
   // 为设置提供跨端口（同域）备份：使用 cookie 存一份 JSON
   function backupSettingsCookie(jsonText){
+    if (window.NAF_PUBLIC_MODE) return;
     try{ document.cookie = `naf_settings=${encodeURIComponent(jsonText)}; max-age=31536000; path=/`; }catch{}
   }
   function readSettingsCookie(){
+    if (window.NAF_PUBLIC_MODE) return null;
     try{
       const m = document.cookie.match(/(?:^|;\s*)naf_settings=([^;]+)/);
       return m ? decodeURIComponent(m[1]) : null;
@@ -864,7 +868,7 @@
       concurrency: clampInt(document.getElementById('concurrency')?.value, 1, 20, 4),
     };
     const text = JSON.stringify(next);
-    localStorage.setItem(LS_KEY, text);
+    window.NAF_STORAGE.setItem(LS_KEY, text);
     backupSettingsCookie(text);
     if(els.cookie) els.cookie.value = next.cookie || '';
     // 保存 Spotify 访问令牌
@@ -872,7 +876,7 @@
       const el = document.getElementById('spotifyAccessToken');
       if (el) {
           const t = el.value.trim();
-          localStorage.setItem('__spotifyToken', t);
+          window.NAF_STORAGE.setItem('__spotifyToken', t);
       }
     }catch{}
     return next;
@@ -885,7 +889,7 @@
     };
     merged.cookie = normalizeNcmCookie(merged.cookie || '');
     const text = JSON.stringify(merged);
-    localStorage.setItem(LS_KEY, text);
+    window.NAF_STORAGE.setItem(LS_KEY, text);
     backupSettingsCookie(text);
     if(els.scanBackendBase && typeof merged.scanBackendBase === 'string') els.scanBackendBase.value = merged.scanBackendBase;
     if(els.corsProxyBase && typeof merged.corsProxyBase === 'string') els.corsProxyBase.value = merged.corsProxyBase;
@@ -1099,7 +1103,7 @@
 
   function readFollowedFromCache(){
     try{
-      const raw = localStorage.getItem(FOLLOW_CACHE_KEY);
+      const raw = window.NAF_STORAGE.getItem(FOLLOW_CACHE_KEY);
       if(raw){
         const obj = JSON.parse(raw);
         if(obj && Array.isArray(obj.ids)){
@@ -1151,7 +1155,7 @@
 
   function readJsonCacheValue(key){
     try{
-      const raw = localStorage.getItem(key);
+      const raw = window.NAF_STORAGE.getItem(key);
       return raw ? JSON.parse(raw) : null;
     }catch{
       return null;
@@ -1262,7 +1266,7 @@
       // 若选择使用缓存且缓存与当前歌单一致，则跳过扫描
       if(useCached){
         try{
-          const raw = localStorage.getItem(PLAYLIST_CACHE_KEY);
+          const raw = window.NAF_STORAGE.getItem(PLAYLIST_CACHE_KEY);
           if(raw){
             const obj = JSON.parse(raw);
             if(obj && Array.isArray(obj.ids)){
@@ -1306,7 +1310,7 @@
         if(statusEl) statusEl.textContent = '任务已启动：正在扫描歌单…';
         ids = await fetchPlaylistArtistIds(s, source, token);
         // 扫描完成后写入缓存（按歌单ID区分）
-        try{ localStorage.setItem(PLAYLIST_CACHE_KEY, JSON.stringify({ ids: Array.from(new Set(ids||[])), sourceId: String(pid), ts: Date.now() })); }catch{}
+        try{ window.NAF_STORAGE.setItem(PLAYLIST_CACHE_KEY, JSON.stringify({ ids: Array.from(new Set(ids||[])), sourceId: String(pid), ts: Date.now() })); }catch{}
       }
       const totalParsed = Array.isArray(ids) ? ids.length : 0;
       if(totalParsed === 0){
@@ -1336,7 +1340,7 @@
       const toAdd = newBeyondPrev.filter(id => !manualSet.has(id));
       for(const id of toAdd){ manualSet.add(id); }
       s.manualArtistIds = Array.from(manualSet);
-      try{ const txt = JSON.stringify(s); localStorage.setItem(LS_KEY, txt); backupSettingsCookie(txt); }catch{}
+      try{ const txt = JSON.stringify(s); window.NAF_STORAGE.setItem(LS_KEY, txt); backupSettingsCookie(txt); }catch{}
       bindSettingsUI(s);
       const prevHitCount = matchedFollowed.length - newBeyondPrev.length;
       const theoreticalNewCount = newBeyondPrev.length;
@@ -1433,7 +1437,7 @@
           if(els.manualArtistIds) els.manualArtistIds.value = merged.join(',');
           // 写入设置
           try{
-            const s = loadSettings(); s.manualArtistIds = merged; const txt = JSON.stringify(s); localStorage.setItem(LS_KEY, txt); backupSettingsCookie(txt);
+            const s = loadSettings(); s.manualArtistIds = merged; const txt = JSON.stringify(s); window.NAF_STORAGE.setItem(LS_KEY, txt); backupSettingsCookie(txt);
           }catch{}
           setImportStatus(`已导入 ${imported.length} 个ID，合并后 ${merged.length} 个`);
         }catch(e){ setImportStatus(`解析失败：${e?.message||e}`); }
@@ -1445,7 +1449,7 @@
   els.btnExportFollow?.addEventListener('click', (ev) => {
     ev.preventDefault();
     try{
-      const raw = localStorage.getItem(FOLLOW_CACHE_KEY);
+      const raw = window.NAF_STORAGE.getItem(FOLLOW_CACHE_KEY);
       let ids = [];
       if(raw){ try{ const obj = JSON.parse(raw); if(Array.isArray(obj?.ids)) ids = obj.ids.map(Number).filter(Number.isFinite); }catch{} }
       const text = ids.join('\n');
@@ -1459,7 +1463,7 @@
   els.btnExportFollowJson?.addEventListener('click', (ev) => {
     ev.preventDefault();
     try{
-      const raw = localStorage.getItem(FOLLOW_CACHE_KEY);
+      const raw = window.NAF_STORAGE.getItem(FOLLOW_CACHE_KEY);
       if(!raw){ setImportStatus('无缓存数据'); return; }
       // Validate JSON
       try{ JSON.parse(raw); }catch(e){ setImportStatus('缓存数据损坏'); return; }
@@ -1497,7 +1501,7 @@
       if(onlyFollowed){
         const set = new Set(parseIds(els.manualArtistIds.value));
         try{
-          const raw = localStorage.getItem(FOLLOW_CACHE_KEY);
+          const raw = window.NAF_STORAGE.getItem(FOLLOW_CACHE_KEY);
           const data = raw ? JSON.parse(raw) : null;
           if(Array.isArray(data?.ids)){
             for(const id of data.ids){ set.add(Number(id)); }
@@ -1534,7 +1538,7 @@
     // 若输入框与已保存值不一致，则临时使用输入值并写入设置，避免重复填入
     if(base !== cfg.apiBase){
       cfg.apiBase = base;
-      try { const txt = JSON.stringify(cfg); localStorage.setItem(LS_KEY, txt); backupSettingsCookie(txt); } catch {}
+      try { const txt = JSON.stringify(cfg); window.NAF_STORAGE.setItem(LS_KEY, txt); backupSettingsCookie(txt); } catch {}
       bindSettingsUI(cfg);
     }
     els.qrStatus.textContent = '正在生成二维码…';
@@ -1661,8 +1665,8 @@
     const days = clampInt(els.daysRange?.value, 1, 30, cfg.daysRange||1);
     
     // Check if we have a valid user token
-    const userToken = localStorage.getItem('spotify_user_token');
-    const hasUserToken = userToken && (Number(localStorage.getItem('spotify_user_token_expiry')||0) > Date.now());
+    const userToken = window.NAF_STORAGE.getItem('spotify_user_token');
+    const hasUserToken = userToken && (Number(window.NAF_STORAGE.getItem('spotify_user_token_expiry')||0) > Date.now());
 
     // If no user token, we need Client Credentials (ID + Secret)
     if(!hasUserToken && (!cfg.spotifyClientId || !cfg.spotifyClientSecret)){ 
@@ -1719,7 +1723,7 @@
       const baseDate = (s.targetDate ? new Date(s.targetDate) : new Date());
       baseDate.setHours(0,0,0,0);
       const rangedKey = buildEnhancedRangeCacheKey(baseDate, s.daysRange);
-      const cached = localStorage.getItem(rangedKey);
+      const cached = window.NAF_STORAGE.getItem(rangedKey);
       if(cached){
         const items = normalizeEnhancedBackendResults(JSON.parse(cached));
         if(Array.isArray(items) && items.length){
@@ -1746,17 +1750,17 @@
 
   function loadSettings(){
     try{
-      let raw = localStorage.getItem(LS_KEY);
-      // 若当前端口的 localStorage 为空，尝试从 cookie 回退并迁移
+      let raw = window.NAF_STORAGE.getItem(LS_KEY);
+      // 若当前端口的 window.NAF_STORAGE 为空，尝试从 cookie 回退并迁移
       if(!raw){
         const fromCookie = readSettingsCookie();
-        if(fromCookie){ try{ localStorage.setItem(LS_KEY, fromCookie); raw = fromCookie; }catch{} }
+        if(fromCookie){ try{ window.NAF_STORAGE.setItem(LS_KEY, fromCookie); raw = fromCookie; }catch{} }
       }
       if(!raw) return { scanBackendBase: '', corsProxyBase: '', apiBase: 'http://127.0.0.1:3000', cookie: '', manualArtistIds: [], daysRange: 1, targetDate: '', alwaysRefreshFollowed: false, skipRescanNextOnce: false, ignoreSkip: false, spotifyClientId: '', spotifyClientSecret: '', spotifyMarket: 'US', useAggregate: false, aggregateCookies: [], playlistSource: '', pinnedPlaylistIds: [], useCachedPlaylistArtists: false, onlyShowFollowedInFeed: false };
       const obj = JSON.parse(raw);
       try{
-        const legacyRestoreFlag = localStorage.getItem('restored_from_file_20260114_v1');
-        const healedFlag = localStorage.getItem('enhanced_follow_source_recovered_v1');
+        const legacyRestoreFlag = window.NAF_STORAGE.getItem('restored_from_file_20260114_v1');
+        const healedFlag = window.NAF_STORAGE.getItem('enhanced_follow_source_recovered_v1');
         if(legacyRestoreFlag && !healedFlag){
           let changed = false;
           if(!obj.useAggregate){ obj.useAggregate = true; changed = true; }
@@ -1765,22 +1769,22 @@
           if(obj.alwaysRefreshFollowed){ obj.alwaysRefreshFollowed = false; changed = true; }
           if(changed){
             const healed = JSON.stringify(obj);
-            localStorage.setItem(LS_KEY, healed);
+            window.NAF_STORAGE.setItem(LS_KEY, healed);
             try{ backupSettingsCookie(healed); }catch{}
           }
-          localStorage.setItem('enhanced_follow_source_recovered_v1', 'done');
-          raw = localStorage.getItem(LS_KEY) || raw;
+          window.NAF_STORAGE.setItem('enhanced_follow_source_recovered_v1', 'done');
+          raw = window.NAF_STORAGE.getItem(LS_KEY) || raw;
         }
-        try{ localStorage.removeItem('follow_source_refresh_once_v1'); }catch{}
+        try{ window.NAF_STORAGE.removeItem('follow_source_refresh_once_v1'); }catch{}
       }catch{}
       // 同步写入 cookie 备份，便于端口切换保留设置
       try{ backupSettingsCookie(raw); }catch{}
       // 将旧默认端口 8011 迁移为当前本地 API 端口 3000（并回写设置）
       try{
         if(!obj.apiBase || /127\.0\.0\.1:8011/.test(String(obj.apiBase))){
-          obj.apiBase = 'http://127.0.0.1:3000';
+          obj.apiBase = window.NAF_PUBLIC_MODE ? '' : 'http://127.0.0.1:3000';
           const migrated = JSON.stringify(obj);
-          localStorage.setItem(LS_KEY, migrated);
+          window.NAF_STORAGE.setItem(LS_KEY, migrated);
           try{ backupSettingsCookie(migrated); }catch{}
         }
       }catch{}
@@ -1803,12 +1807,12 @@
       obj.smartScan = obj.smartScan !== undefined ? Boolean(obj.smartScan) : true;
       obj.concurrency = clampInt(obj.concurrency, 1, 20, 4);
       // Spotify 设置兜底
-      if(!obj.spotifyClientId) obj.spotifyClientId = '668aaab2a5ac4085aae1146e29c19193';
-      if(!obj.spotifyClientSecret) obj.spotifyClientSecret = 'ca8df2ff33e34954b9f8782c8257624d';
+      if(!obj.spotifyClientId) obj.spotifyClientId = '';
+      if(!obj.spotifyClientSecret) obj.spotifyClientSecret = '';
       obj.spotifyMarket = (typeof obj.spotifyMarket === 'string' && obj.spotifyMarket) ? obj.spotifyMarket : 'US';
       return obj;
     }catch{
-      return { scanBackendBase: '', corsProxyBase: '', apiBase: 'http://127.0.0.1:3000', cookie: '', manualArtistIds: [], daysRange: 1, targetDate: '', alwaysRefreshFollowed: false, skipRescanNextOnce: false, ignoreSkip: false, spotifyClientId: '668aaab2a5ac4085aae1146e29c19193', spotifyClientSecret: 'ca8df2ff33e34954b9f8782c8257624d', spotifyMarket: 'US', useAggregate: false, aggregateCookies: [], playlistSource: '', pinnedPlaylistIds: [], useCachedPlaylistArtists: false, onlyShowFollowedInFeed: false, reuseArtistCache: false, smartScan: true, concurrency: 4 };
+      return { scanBackendBase: '', corsProxyBase: '', apiBase: 'http://127.0.0.1:3000', cookie: '', manualArtistIds: [], daysRange: 1, targetDate: '', alwaysRefreshFollowed: false, skipRescanNextOnce: false, ignoreSkip: false, spotifyClientId: '', spotifyClientSecret: '', spotifyMarket: 'US', useAggregate: false, aggregateCookies: [], playlistSource: '', pinnedPlaylistIds: [], useCachedPlaylistArtists: false, onlyShowFollowedInFeed: false, reuseArtistCache: false, smartScan: true, concurrency: 4 };
     }
   }
 
@@ -1856,8 +1860,8 @@
     if(!btn) return;
     
     // Check if logged in
-    const userToken = localStorage.getItem('spotify_user_token');
-    const expiry = Number(localStorage.getItem('spotify_user_token_expiry') || '0');
+    const userToken = window.NAF_STORAGE.getItem('spotify_user_token');
+    const expiry = Number(window.NAF_STORAGE.getItem('spotify_user_token_expiry') || '0');
     const isLoggedIn = userToken && Date.now() < expiry;
     
     if(isLoggedIn){
@@ -1875,9 +1879,9 @@
     btn.onclick = async () => {
         if(isLoggedIn){
             if(confirm('确定要注销 Spotify 登录吗？')){
-                localStorage.removeItem('spotify_user_token');
-                localStorage.removeItem('spotify_user_token_expiry');
-                localStorage.removeItem('spotify_refresh_token');
+                window.NAF_STORAGE.removeItem('spotify_user_token');
+                window.NAF_STORAGE.removeItem('spotify_user_token_expiry');
+                window.NAF_STORAGE.removeItem('spotify_refresh_token');
                 bindSpotifyLoginUI(s); // Refresh UI
                 alert('已注销');
             }
@@ -1899,8 +1903,8 @@
         const codeVerifier = generateRandomString(128);
         const codeChallenge = await generateCodeChallenge(codeVerifier);
         
-        localStorage.setItem('spotify_pkce_verifier', codeVerifier);
-        localStorage.setItem('spotify_client_id_temp', clientId); // Store Client ID temporarily
+        window.NAF_STORAGE.setItem('spotify_pkce_verifier', codeVerifier);
+        window.NAF_STORAGE.setItem('spotify_client_id_temp', clientId); // Store Client ID temporarily
         
         const params = new URLSearchParams({
             response_type: 'code',
@@ -2421,7 +2425,7 @@
           changed = true;
         }
         if(changed){
-          try{ const txt = JSON.stringify(cfg); localStorage.setItem(LS_KEY, txt); backupSettingsCookie(txt); }catch{}
+          try{ const txt = JSON.stringify(cfg); window.NAF_STORAGE.setItem(LS_KEY, txt); backupSettingsCookie(txt); }catch{}
           try{ bindSettingsUI(cfg); }catch{}
         }
         await runDiagnosticsImpl();
@@ -2490,7 +2494,7 @@
         renderEnhancedPanelsFromState();
         activateEnhancedTab(__enhancedUiState.activeTab, { preserveCurrentScroll: false, restoreScroll: false });
         persistEnhancedUiState();
-        try{ localStorage.setItem(rangedKey, JSON.stringify(items)); }catch{}
+        try{ window.NAF_STORAGE.setItem(rangedKey, JSON.stringify(items)); }catch{}
         if(statusEl) statusEl.textContent = `云端快照 ${day} · ${items.length} 张（只读模式）`;
       } else {
         renderFeedSection(ENHANCED_TAB_NEW, [], `${day} 快照中未发现新作。`);
@@ -2670,7 +2674,7 @@
           ...(Array.isArray(__enhancedUiState.compilations) ? __enhancedUiState.compilations : [])
         ];
         if(finalItems.length > 0){
-          try{ localStorage.setItem(rangeCacheKey, JSON.stringify(finalItems)); }catch{}
+          try{ window.NAF_STORAGE.setItem(rangeCacheKey, JSON.stringify(finalItems)); }catch{}
           renderEnhancedPanelsFromState();
           persistEnhancedUiState();
         } else {
@@ -2821,8 +2825,8 @@
       .filter(Boolean);
     const markets = parseMarkets(cfg.spotifyMarket||'US');
 
-    const userToken = localStorage.getItem('spotify_user_token');
-    const hasUserToken = userToken && (Number(localStorage.getItem('spotify_user_token_expiry')||0) > Date.now());
+    const userToken = window.NAF_STORAGE.getItem('spotify_user_token');
+    const hasUserToken = userToken && (Number(window.NAF_STORAGE.getItem('spotify_user_token_expiry')||0) > Date.now());
 
     if(!hasUserToken && (!clientId || !clientSecret)){
       infoEl.innerHTML = `<div class="empty">未登录 Spotify 且未配置 Client ID/Secret，无法自动检索。请点击上方“Spotify 登录”按钮获取 Token。</div>`;
@@ -3045,7 +3049,7 @@
     // [New] 优先处理 skipRescanNextOnce：强制使用缓存（忽略过期时间）
     if(cfg.skipRescanNextOnce){
         try{
-            const raw = localStorage.getItem(FOLLOW_CACHE_KEY);
+            const raw = window.NAF_STORAGE.getItem(FOLLOW_CACHE_KEY);
             if(raw){
                 const obj = JSON.parse(raw);
                 // 只要有数据就用，不检查过期
@@ -3060,7 +3064,7 @@
     
     if(!isReusingCache && !cfg.alwaysRefreshFollowed && !forceRefreshForSmartScan){
       try{
-        const raw = localStorage.getItem(FOLLOW_CACHE_KEY);
+        const raw = window.NAF_STORAGE.getItem(FOLLOW_CACHE_KEY);
         if(raw){
           const obj = JSON.parse(raw);
           // 检查缓存有效性
@@ -3189,7 +3193,7 @@
         }
         // 更新缓存
         if(followed.length > 0){
-           try{ localStorage.setItem(FOLLOW_CACHE_KEY, JSON.stringify({ ids: followed, ts: Date.now() })); }catch{}
+           try{ window.NAF_STORAGE.setItem(FOLLOW_CACHE_KEY, JSON.stringify({ ids: followed, ts: Date.now() })); }catch{}
         }
     }
     
@@ -3202,7 +3206,7 @@
            const currentPlaylistId = extractPlaylistId(cfg.playlistSource);
            if(cfg.useCachedPlaylistArtists || cfg.reuseArtistCache || cfg.skipRescanNextOnce || currentPlaylistId){
                try{
-                   const rawPl = localStorage.getItem(PLAYLIST_CACHE_KEY);
+                   const rawPl = window.NAF_STORAGE.getItem(PLAYLIST_CACHE_KEY);
                    if(rawPl){
                        const obj = JSON.parse(rawPl);
                        const sourceMatches = String(obj?.sourceId || '') === String(currentPlaylistId || '');
@@ -3968,7 +3972,7 @@
     el.innerHTML = items.map(item => `
       <article class="card">
         <div class="cover">
-          <img src="${escapeAttr(item.picUrl)}" alt="${escapeAttr(item.name)}" />
+          <img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${escapeAttr(item.picUrl)}" alt="${escapeAttr(item.name)}" />
         </div>
         <div class="meta">
           <div class="title">[扩展] ${escapeHtml(item.name)}</div>
@@ -4000,9 +4004,9 @@
 
   // Spotify：获取 Token（Client Credentials 或 User Token）
   async function fetchSpotifyToken(clientId, clientSecret){
-    // 1. 尝试使用 User Token (localStorage)
-    const userToken = localStorage.getItem('spotify_user_token');
-    const expiry = Number(localStorage.getItem('spotify_user_token_expiry') || '0');
+    // 1. 尝试使用 User Token (window.NAF_STORAGE)
+    const userToken = window.NAF_STORAGE.getItem('spotify_user_token');
+    const expiry = Number(window.NAF_STORAGE.getItem('spotify_user_token_expiry') || '0');
     // 如果有 User Token 且未过期，直接使用
     if(userToken && Date.now() < expiry){
         console.log('[Spotify] Using User Token from storage');
@@ -4842,7 +4846,7 @@
     return `
       <article class="card" data-publish="${Number(item.publishTime)||0}" data-track-list="${encodeTrackListAttr(item.tracks)}">
         <div class="cover">
-          <img src="${escapeAttr(item.picUrl)}" alt="${escapeAttr(item.name)}" />
+          <img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${escapeAttr(item.picUrl)}" alt="${escapeAttr(item.name)}" />
         </div>
         <div class="meta">
           <div class="title">${escapeHtml(item.name)}</div>
@@ -6154,14 +6158,14 @@
   // 艺人检查缓存：用于跳过近期无新作的艺人，提升大规模账号性能
   function loadArtistCheckCache(){
     try{
-      const raw = localStorage.getItem(ARTIST_CHECK_CACHE_KEY);
+      const raw = window.NAF_STORAGE.getItem(ARTIST_CHECK_CACHE_KEY);
       if(!raw) return {};
       const obj = JSON.parse(raw);
       return (obj && typeof obj === 'object') ? obj : {};
     }catch{ return {}; }
   }
   function saveArtistCheckCache(cache){
-    try{ localStorage.setItem(ARTIST_CHECK_CACHE_KEY, JSON.stringify(cache || {})); }catch{}
+    try{ window.NAF_STORAGE.setItem(ARTIST_CHECK_CACHE_KEY, JSON.stringify(cache || {})); }catch{}
   }
   function shouldFetchArtist(cache, artistId, startTs, allowSkip=true){
     // [Restored] 恢复智能跳过逻辑，大幅提升扫描速度

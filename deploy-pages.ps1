@@ -29,6 +29,8 @@ function Run-Git {
 }
 
 try {
+  & node (Join-Path $PSScriptRoot 'scripts\lib\check-public.js') $PSScriptRoot
+  if ($LASTEXITCODE -ne 0) { Stop-AndWait "Privacy check failed. Run regen-seed.bat before deploying." }
   if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Stop-AndWait "Git not found. Install git from https://git-scm.com/download/win first."
   }
@@ -149,9 +151,9 @@ try {
   $rc = Run-Git @('branch','-M','gh-pages')
   if ($rc -ne 0) { Stop-AndWait "git branch -M gh-pages failed" }
 
-  Write-Host "   step 4/4: git push -u -f origin gh-pages  <-- actual upload"
+  Write-Host "   step 4/4: git push -u origin gh-pages  <-- actual upload"
   Write-Host "   If a browser / login window pops up, sign in to GitHub there."
-  $rc = Run-Git @('push','-u','-f','origin','gh-pages')
+  $rc = Run-Git @('push','-u','origin','gh-pages')
   if ($rc -ne 0) {
     Stop-AndWait ("git push FAILED. Most common causes:`n" +
       "  1) Repo does not exist on github.com -> create it at:`n" +

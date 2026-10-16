@@ -63,6 +63,12 @@ jobs:
         with:
           node-version: '20'
 
+      - name: 检查公开配置隐私
+        run: node scripts/lib/check-public.js .
+
+      - name: 验证接口与会话隔离
+        run: node --test scripts/test-public.js
+
       - name: 启动网易云 API 服务
         env:
           PORT: '3100'

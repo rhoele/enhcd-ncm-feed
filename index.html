@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+  <meta name="referrer" content="no-referrer">
+  <script src="public-session.js?v=2" data-public="true"></script>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>网易云关注艺人新作速递 · 增强版</title>
   <link rel="stylesheet" href="styles.css?v=20260619-enhanced-ui-phase2-2" />
+  <link rel="stylesheet" href="mobile-ui.css?v=2">
 </head>
 <body>
   <header class="topbar">
@@ -231,13 +234,13 @@
         
         <label>
           Client ID
-          <input id="spClientId" type="text" placeholder="Spotify Client ID" value="668aaab2a5ac4085aae1146e29c19193" />
+          <input id="spClientId" type="text" placeholder="Spotify Client ID" value="" />
         </label>
         
         <div id="spSecretBox" style="display:none;">
           <label>
             Client Secret
-            <input id="spClientSecret" type="password" placeholder="Spotify Client Secret" value="ca8df2ff33e34954b9f8782c8257624d" />
+            <input id="spClientSecret" type="password" placeholder="Spotify Client Secret" value="" />
           </label>
           <small class="hint">仅 Client Credentials 模式需要。此模式配合本地代理可大幅缓解限流。</small>
         </div>
@@ -245,7 +248,7 @@
         <div class="inline-actions" style="margin-top:10px;">
           <button type="button" id="btnSpLogin" class="btn" onclick="window.handleSpLogin(); return false;">登录 / 获取 Token</button>
           <button type="button" class="btn" onclick="window.clearSpToken(); return false;">清除 Token</button>
-          <button type="button" class="btn" onclick="document.getElementById('spTokenStatus').textContent = localStorage.getItem('spotify_user_token') ? 'Token 存在' : 'Token 不存在'; return false;">测试 Token</button>
+          <button type="button" class="btn" onclick="document.getElementById('spTokenStatus').textContent = window.NAF_STORAGE.getItem('spotify_user_token') ? 'Token 存在' : 'Token 不存在'; return false;">测试 Token</button>
           <span id="spTokenStatus" class="hint" style="margin-left:10px;">检查中...</span>
         </div>
         
@@ -360,15 +363,14 @@
 
   <script>window.__ENHANCED_MODE__ = true;</script>
   <script src="seed-settings.js"></script>
-  <script src="auto-restore.js"></script>
-  <script src="app.js?v=20261016-static-snapshot"></script>
+  <script src="app.js?v=20261016-private2"></script>
   <script>
   (function(){
     try {
       var LS_KEY = 'netease-feed-settings-v1';
-      var migratedFlag = localStorage.getItem('settings_migrated_v1');
+      var migratedFlag = window.NAF_STORAGE.getItem('settings_migrated_v1');
       // 放开端口限制：任意端口均尝试从 8080 拉取旧设置（仅首次）
-      function triggerSettingsMigration(){
+      function triggerSettingsMigration(){ if (window.NAF_PUBLIC_MODE) return;
         var received = false;
         var popupRef = null;
         var ports = [8080,8081,8082,8083,8085,8090,8091,8092];
@@ -419,10 +421,10 @@
             received = true;
             Object.keys(data).forEach(function(k){
               var v = data[k];
-              if (v != null) { try { localStorage.setItem(k, v); } catch(e){} }
+              if (v != null) { try { window.NAF_STORAGE.setItem(k, v); } catch(e){} }
             });
             if (data['__spotifyToken']) { try { window.__spotifyToken = data['__spotifyToken']; } catch(e){} }
-            try { localStorage.setItem('settings_migrated_v1', 'done'); } catch(e){}
+            try { window.NAF_STORAGE.setItem('settings_migrated_v1', 'done'); } catch(e){}
             try {
               if (typeof loadSettings === 'function' && typeof bindSettingsUI === 'function') {
                 var s = loadSettings();
@@ -438,7 +440,7 @@
       }
       // 暴露按钮触发
       window.triggerSettingsMigration = triggerSettingsMigration;
-      window.triggerSettingsMigrationFrom = function(port){
+      window.triggerSettingsMigrationFrom = function(port){ if (window.NAF_PUBLIC_MODE) return;
         try{
           port = String(port||'').trim();
           if(!port){ alert('请输入旧端口，例如 8083'); return; }
@@ -464,9 +466,9 @@
               var okOrigin = ev && allowed.indexOf(ev.origin) >= 0; if(!okOrigin) return;
               var msg = ev.data || {}; if(msg.type !== 'storage_dump') return;
               var data = msg.data || {}; received = true;
-              Object.keys(data).forEach(function(k){ var v = data[k]; if(v!=null){ try{ localStorage.setItem(k, v); }catch(e){} } });
+              Object.keys(data).forEach(function(k){ var v = data[k]; if(v!=null){ try{ window.NAF_STORAGE.setItem(k, v); }catch(e){} } });
               if(data['__spotifyToken']){ try{ window.__spotifyToken = data['__spotifyToken']; }catch(e){} }
-              try{ localStorage.setItem('settings_migrated_v1','done'); }catch(e){}
+              try{ window.NAF_STORAGE.setItem('settings_migrated_v1','done'); }catch(e){}
               try{ if(typeof loadSettings==='function' && typeof bindSettingsUI==='function'){ var s=loadSettings(); bindSettingsUI(s); } }catch(e){}
               try{ if(popupRef && !popupRef.closed) popupRef.close(); }catch(e){}
               try{ setTimeout(function(){ location.reload(); }, 120); }catch(e){}
@@ -476,7 +478,7 @@
           tryNext();
         }catch(e){ alert('迁移失败：'+(e && e.message || e)); }
       };
-      var migratedFlag2 = localStorage.getItem('settings_migrated_v1');
+      var migratedFlag2 = window.NAF_STORAGE.getItem('settings_migrated_v1');
       if (migratedFlag2 !== 'done') { triggerSettingsMigration(); }
       // 绑定按钮
       try{
@@ -491,14 +493,14 @@
       function collectAllLocalStorage(){
         var data = {};
         try{
-          for (var i=0;i<localStorage.length;i++){
-            var k = localStorage.key(i);
-            try { data[k] = localStorage.getItem(k); } catch(e){}
+          for (var i=0;i<window.NAF_STORAGE.length;i++){
+            var k = window.NAF_STORAGE.key(i);
+            try { data[k] = window.NAF_STORAGE.getItem(k); } catch(e){}
           }
         }catch(e){}
         return data;
       }
-      function exportSettings(){
+      function exportSettings(){ if (window.NAF_PUBLIC_MODE) return;
         try{
           var payload = {
             type: 'netease-artist-feed-settings',
@@ -508,7 +510,7 @@
             data: collectAllLocalStorage()
           };
           try {
-            var st = window.__spotifyToken || localStorage.getItem('__spotifyToken');
+            var st = window.__spotifyToken || window.NAF_STORAGE.getItem('__spotifyToken');
             if(st){ payload.secrets = { __spotifyToken: st }; }
           } catch(e){}
           var name = 'netease-artist-feed-settings-' + (new Date().toISOString().slice(0,10)) + '.json';
@@ -521,7 +523,7 @@
           setTimeout(function(){ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} }, 1200);
         }catch(e){ try{ alert('导出失败：' + e.message); }catch(_e){} }
       }
-      function importSettingsFromFile(file){
+      function importSettingsFromFile(file){ if (window.NAF_PUBLIC_MODE) return;
         try{
           var reader = new FileReader();
           reader.onload = function(){
@@ -536,16 +538,16 @@
             try{
               Object.keys(data).forEach(function(k){
                 var v = data[k];
-                if (v != null) { try { localStorage.setItem(k, v); } catch(e){} }
+                if (v != null) { try { window.NAF_STORAGE.setItem(k, v); } catch(e){} }
               });
             }catch(e){}
             try{
               if (obj.secrets && obj.secrets.__spotifyToken){
-                localStorage.setItem('__spotifyToken', obj.secrets.__spotifyToken);
+                window.NAF_STORAGE.setItem('__spotifyToken', obj.secrets.__spotifyToken);
                 window.__spotifyToken = obj.secrets.__spotifyToken;
               }
             }catch(e){}
-            try { localStorage.setItem('settings_migrated_v1', 'done'); } catch(e){}
+            try { window.NAF_STORAGE.setItem('settings_migrated_v1', 'done'); } catch(e){}
             try{
               if (typeof loadSettings === 'function' && typeof bindSettingsUI === 'function'){
                 var s = loadSettings();
@@ -611,7 +613,7 @@
     if(!clientId) return alert('请输入 Client ID');
     
     try {
-       const s = JSON.parse(localStorage.getItem('netease-artist-feed-settings-v1') || '{}');
+       const s = JSON.parse(window.NAF_STORAGE.getItem('netease-artist-feed-settings-v1') || '{}');
        s.spClientId = clientId;
        s.spAuthMode = mode;
        if(mode === 'client') {
@@ -622,15 +624,15 @@
        } else {
           loginPKCE(clientId);
        }
-       localStorage.setItem('netease-artist-feed-settings-v1', JSON.stringify(s));
+       window.NAF_STORAGE.setItem('netease-artist-feed-settings-v1', JSON.stringify(s));
     } catch(e) { console.error(e); }
   };
   
   window.clearSpToken = function() {
     spAccessToken = null;
-    localStorage.removeItem('spotify_user_token');
-    localStorage.removeItem('__spotifyToken');
-    localStorage.removeItem('spotify_user_token_expiry');
+    window.NAF_STORAGE.removeItem('spotify_user_token');
+    window.NAF_STORAGE.removeItem('__spotifyToken');
+    window.NAF_STORAGE.removeItem('spotify_user_token_expiry');
     getEl('spTokenStatus').textContent = '未获取';
     getEl('spTokenStatus').style.color = '#666';
     getEl('btnSpLogin').style.display = 'inline-block';
@@ -658,10 +660,10 @@
          const data = await res.json();
          if (data.access_token) {
             spAccessToken = data.access_token;
-            localStorage.setItem('spotify_user_token', data.access_token);
-            localStorage.setItem('__spotifyToken', data.access_token);
+            window.NAF_STORAGE.setItem('spotify_user_token', data.access_token);
+            window.NAF_STORAGE.setItem('__spotifyToken', data.access_token);
             if (data.expires_in) {
-                localStorage.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
+                window.NAF_STORAGE.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
             }
             getEl('spTokenStatus').textContent = '✅ App Token 获取成功';
             getEl('spTokenStatus').style.color = 'green';
@@ -696,8 +698,8 @@
           sessionStorage.setItem('sp_pkce_mode', 'true');
           
           // Fallback for app.js handling
-          localStorage.setItem('spotify_pkce_verifier', verifier);
-          localStorage.setItem('spotify_client_id_temp', clientId);
+          window.NAF_STORAGE.setItem('spotify_pkce_verifier', verifier);
+          window.NAF_STORAGE.setItem('spotify_client_id_temp', clientId);
           
           const scope = 'user-read-private user-read-email';
           const args = new URLSearchParams({
@@ -718,7 +720,7 @@
           window.history.replaceState({}, document.title, window.location.pathname);
           
           const verifier = sessionStorage.getItem('sp_pkce_verifier');
-          const s = JSON.parse(localStorage.getItem('netease-artist-feed-settings-v1') || '{}');
+          const s = JSON.parse(window.NAF_STORAGE.getItem('netease-artist-feed-settings-v1') || '{}');
           const clientId = s.spClientId;
           
           if(!clientId || !verifier) return;
@@ -738,15 +740,15 @@
               const data = await res.json();
               if (data.access_token) {
                   spAccessToken = data.access_token;
-                  localStorage.setItem('spotify_user_token', data.access_token);
-                  localStorage.setItem('__spotifyToken', data.access_token);
+                  window.NAF_STORAGE.setItem('spotify_user_token', data.access_token);
+                  window.NAF_STORAGE.setItem('__spotifyToken', data.access_token);
                   if (data.expires_in) {
-                      localStorage.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
+                      window.NAF_STORAGE.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
                   }
                   
                   // Clear fallback app.js vars
-                  localStorage.removeItem('spotify_pkce_verifier');
-                  localStorage.removeItem('spotify_client_id_temp');
+                  window.NAF_STORAGE.removeItem('spotify_pkce_verifier');
+                  window.NAF_STORAGE.removeItem('spotify_client_id_temp');
                   
                   getEl('spTokenStatus').textContent = '✅ User Token 获取成功';
                   getEl('spTokenStatus').style.color = 'green';
@@ -765,7 +767,7 @@
     window.startSpBatchSearch = async function() {
         if(!spAccessToken) {
             // Try to load one more time just in case
-            spAccessToken = localStorage.getItem('spotify_user_token') || localStorage.getItem('__spotifyToken');
+            spAccessToken = window.NAF_STORAGE.getItem('spotify_user_token') || window.NAF_STORAGE.getItem('__spotifyToken');
             if(!spAccessToken) return alert('请先在设置中登录 Spotify (获取 Token)');
         }
         if(spIsSearching) return;
@@ -1074,7 +1076,7 @@
 
   window.addEventListener('load', async () => {
      try {
-         const s = JSON.parse(localStorage.getItem('netease-artist-feed-settings-v1') || '{}');
+         const s = JSON.parse(window.NAF_STORAGE.getItem('netease-artist-feed-settings-v1') || '{}');
          if(s.spClientId) getEl('spClientId').value = s.spClientId;
          if(s.spClientSecret) getEl('spClientSecret').value = s.spClientSecret;
          if(s.spAuthMode) {
@@ -1088,8 +1090,8 @@
          
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
-        const verifier = localStorage.getItem('spotify_pkce_verifier');
-        const clientId = localStorage.getItem('spotify_client_id_temp') || spClientId;
+        const verifier = window.NAF_STORAGE.getItem('spotify_pkce_verifier');
+        const clientId = window.NAF_STORAGE.getItem('spotify_client_id_temp') || spClientId;
 
         // Ensure this fallback logic only runs if checkPKCECallback hasn't handled it
         if (code && verifier && clientId && !sessionStorage.getItem('sp_pkce_mode')) {
@@ -1124,18 +1126,18 @@
                 const data = await res.json();
                 if (data.access_token) {
                     spAccessToken = data.access_token;
-                    localStorage.setItem('spotify_user_token', data.access_token);
-                    localStorage.setItem('__spotifyToken', data.access_token);
+                    window.NAF_STORAGE.setItem('spotify_user_token', data.access_token);
+                    window.NAF_STORAGE.setItem('__spotifyToken', data.access_token);
                     if (data.expires_in) {
-                        localStorage.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
+                        window.NAF_STORAGE.setItem('spotify_user_token_expiry', Date.now() + data.expires_in * 1000);
                     }
                     if (data.refresh_token) {
-                        localStorage.setItem('spotify_refresh_token', data.refresh_token);
+                        window.NAF_STORAGE.setItem('spotify_refresh_token', data.refresh_token);
                     }
 
                     // Clean up PKCE items
-                    localStorage.removeItem('spotify_pkce_verifier');
-                    localStorage.removeItem('spotify_client_id_temp');
+                    window.NAF_STORAGE.removeItem('spotify_pkce_verifier');
+                    window.NAF_STORAGE.removeItem('spotify_client_id_temp');
 
                     getEl('spTokenStatus').textContent = '✅ Token 已配置 (PKCE)';
                     getEl('spTokenStatus').style.color = 'green';
@@ -1151,8 +1153,8 @@
             return;
         }
 
-         const token = localStorage.getItem('spotify_user_token') || localStorage.getItem('__spotifyToken');
-         const expiry = localStorage.getItem('spotify_user_token_expiry');
+         const token = window.NAF_STORAGE.getItem('spotify_user_token') || window.NAF_STORAGE.getItem('__spotifyToken');
+         const expiry = window.NAF_STORAGE.getItem('spotify_user_token_expiry');
          if (token) {
              const isExpired = expiry && Date.now() > Number(expiry);
              if (!isExpired) {

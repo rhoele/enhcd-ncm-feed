@@ -28,6 +28,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { NcmReadClient } = require('./lib/ncm-read-client');
 const {
   createCollector,
   writeSnapshot,
@@ -56,6 +57,7 @@ const ALBUM_LIMIT = Math.max(1, Math.min(200, parseInt(pickArg('--limit', '100')
 const MAX_ARTISTS = Math.max(0, parseInt(pickArg('--max-artists', '0'), 10) || 0);
 const TIMEOUT_MS = Math.max(3000, parseInt(pickArg('--timeout', '15000'), 10) || 15000);
 const COOKIE = pickArg('--cookie', process.env.NAF_NCM_COOKIE || '');
+const apiClient = new NcmReadClient({ base: API, cookie: COOKIE, timeout: TIMEOUT_MS });
 // 「合辑参与」通道：默认开启，按分片轮转以控制在单 job 时间内
 const COMPILATIONS = !args.includes('--no-compilations');
 const COMPILATION_SHARDS = Math.max(1, Math.min(60, parseInt(pickArg('--compilation-shards', '8'), 10) || 8));
@@ -71,25 +73,12 @@ const PRUNE = !PARTIAL && !args.includes('--keep-old');
 const ENRICH = !args.includes('--no-enrich');
 const ARTISTS_FILE_PATH = path.resolve(pickArg('--artists', path.join(DST_MOBILE_DIR, ARTISTS_FILE)));
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
 function readPrevIndex() {
   try { return JSON.parse(fs.readFileSync(path.join(DST_MOBILE_DIR, 'index.json'), 'utf8')); } catch { return null; }
 }
 
 async function fetchArtistAlbums(artistId) {
-  const url = new URL(API + '/artist/album');
-  url.searchParams.set('id', String(artistId));
-  url.searchParams.set('limit', String(ALBUM_LIMIT));
-  if (COOKIE) url.searchParams.set('cookie', COOKIE);
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    if (Number(json.code) !== 200) throw new Error('code=' + json.code);
+    const json = await apiClient.read('/artist/album', { id: artistId, limit: ALBUM_LIMIT });
     const list = Array.isArray(json.hotAlbums) ? json.hotAlbums
       : (Array.isArray(json.albums) ? json.albums : []);
     return list.map(item => ({
@@ -102,43 +91,12 @@ async function fetchArtistAlbums(artistId) {
         .map(a => String((a && a.name) || '').trim())
         .filter(Boolean)
     })).filter(a => a.id > 0);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function fetchWithRetry(artistId, attempts) {
-  let lastErr = null;
-  for (let i = 1; i <= attempts; i += 1) {
-    try {
-      return await fetchArtistAlbums(artistId);
-    } catch (e) {
-      lastErr = e;
-      if (i < attempts) await sleep(400 * i);
-    }
-  }
-  throw lastErr || new Error('unknown');
 }
 
 /** 取艺人最近单曲（order=time），用于「合辑参与」的候选专辑 */
 async function fetchArtistSongs(artistId) {
-  const url = new URL(API + '/artist/songs');
-  url.searchParams.set('id', String(artistId));
-  url.searchParams.set('order', 'time');
-  url.searchParams.set('limit', String(SONGS_LIMIT));
-  if (COOKIE) url.searchParams.set('cookie', COOKIE);
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    if (Number(json.code) !== 200) throw new Error('code=' + json.code);
-    return Array.isArray(json.songs) ? json.songs : [];
-  } finally {
-    clearTimeout(timer);
-  }
+  const json = await apiClient.read('/artist/songs', { id: artistId, order: 'time', limit: SONGS_LIMIT });
+  return Array.isArray(json.songs) ? json.songs : [];
 }
 
 /**
@@ -146,50 +104,16 @@ async function fetchArtistSongs(artistId) {
  * @returns {Promise<null|{publishTime:number,company:string,artists:string[]}>}
  */
 async function fetchAlbumMeta(albumId) {
-  const url = new URL(API + '/album');
-  url.searchParams.set('id', String(albumId));
-  if (COOKIE) url.searchParams.set('cookie', COOKIE);
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const album = json && json.album;
-    if (!album) return null;
-    const artists = (Array.isArray(album.artists) ? album.artists : [])
-      .map(a => String((a && a.name) || '').trim())
-      .filter(Boolean);
-    return {
-      publishTime: Number(album.publishTime) || 0,
-      company: String(album.company || '').trim(),
-      artists
-    };
+    return await apiClient.album(albumId);
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
 /** 补齐厂牌信息（对齐本地 VA_Album_Date_Cache 里的 company 字段） */
 async function fetchAlbumCompany(albumId) {
-  const url = new URL(API + '/album');
-  url.searchParams.set('id', String(albumId));
-  if (COOKIE) url.searchParams.set('cookie', COOKIE);
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) return '';
-    const json = await res.json();
-    return String(json?.album?.company || '').trim();
-  } catch {
-    return '';
-  } finally {
-    clearTimeout(timer);
-  }
+  return (await fetchAlbumMeta(albumId))?.company || '';
 }
 
 async function enrichCompanies(collector) {
@@ -278,7 +202,7 @@ async function enrichCompanies(collector) {
       if (i >= targets.length) return;
       const artistId = targets[i];
       try {
-        const albums = await fetchWithRetry(artistId, 2);
+        const albums = await fetchArtistAlbums(artistId);
         okCount += 1;
         albumSeen += albums.length;
         albumIdsByArtist.set(artistId, new Set(albums.map(a => a.id)));
@@ -334,27 +258,29 @@ async function enrichCompanies(collector) {
       albumDateCache.set(albumId, meta.publishTime);
       if (!collector.wanted.has(beijingDayKey(meta.publishTime))) continue;
 
-      const ar = Array.isArray(song.ar) ? song.ar
-        : (Array.isArray(song.artists) ? song.artists : []);
-      const matched = ar.find(a => Number(a && a.id) === artistId);
-      const songId = Number(song.id) || 0;
+      for (const matchedSong of songs.filter(s => Number(s?.al?.id) === albumId)) {
+        const ar = Array.isArray(matchedSong.ar) ? matchedSong.ar
+          : (Array.isArray(matchedSong.artists) ? matchedSong.artists : []);
+        const matched = ar.find(a => Number(a && a.id) === artistId);
+        const songId = Number(matchedSong.id) || 0;
 
-      if (collector.addCompilation({
-        id: albumId,
-        name: String((song.al && song.al.name) || '未知专辑'),
-        picUrl: String((song.al && song.al.picUrl) || ''),
-        publishTime: meta.publishTime,
-        artistId,
-        artistName: matched ? String(matched.name || '').trim() : '',
-        albumArtists: meta.artists,
-        company: meta.company,
-        track: {
-          id: songId,
-          name: String(song.name || '未命名单曲'),
-          artists: ar.map(a => String((a && a.name) || '').trim()).filter(Boolean).join(' / '),
-          link: songId ? ('https://music.163.com/#/song?id=' + songId) : ''
-        }
-      })) added += 1;
+        if (collector.addCompilation({
+          id: albumId,
+          name: String((song.al && song.al.name) || '未知专辑'),
+          picUrl: String((song.al && song.al.picUrl) || ''),
+          publishTime: meta.publishTime,
+          artistId,
+          artistName: matched ? String(matched.name || '').trim() : '',
+          albumArtists: meta.artists,
+          company: meta.company,
+          track: {
+            id: songId,
+            name: String(matchedSong.name || '未命名单曲'),
+            artists: ar.map(a => String((a && a.name) || '').trim()).filter(Boolean).join(' / '),
+            link: songId ? ('https://music.163.com/#/song?id=' + songId) : ''
+          }
+        })) added += 1;
+      }
     }
     return added;
   }
@@ -443,6 +369,7 @@ async function enrichCompanies(collector) {
   console.log('  成功 ' + okCount + ' / 失败 ' + failCount + '，抓取专辑 ' + albumSeen + ' 张');
   console.log('  快照条目：共 ' + collector.hitCount + ' 条（其中合辑 ' + compilationCount + ' 条）');
   console.log('  专辑日期缓存：' + albumDateCache.size + ' 条（本次由 ' + albumDateCacheLoaded + ' 增长而来）');
+  console.log('  API requests/cache/coalesced/retries: ' + JSON.stringify(apiClient.stats));
   for (const d of indexDates) console.log('    ' + d.date + ' → ' + d.count + ' 条');
   if (pruned) console.log('  已清理过期快照：' + pruned + ' 个文件');
   console.log('  索引：' + path.join(DST_MOBILE_DIR, 'index.json')

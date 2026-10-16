@@ -216,16 +216,23 @@ function writeSnapshot(opts) {
 
   for (const day of Array.from(collector.byDay.keys()).sort().reverse()) {
     const items = Array.from(collector.byDay.get(day).values())
+      .map(item => ({
+        ...item,
+        // Stable across cache refreshes and tab reclassification for notification deduplication.
+        releaseKey: 'netease:album:' + Number(item.id) + ':' + Number(item.publishTime)
+      }))
       .sort((a, b) => Number(b.publishTime) - Number(a.publishTime) || a.id - b.id);
     fs.writeFileSync(
       path.join(dstMobileDir, day + '.json'),
-      JSON.stringify({ date: day, generated_at: nowIso, count: items.length, items }, null, 0),
+      JSON.stringify({ schema_version: 1, timezone: 'Asia/Shanghai', date: day, generated_at: nowIso, count: items.length, items }, null, 0),
       'utf8'
     );
     indexDates.push({ date: day, count: items.length, generated_at: nowIso });
   }
 
   const indexPayload = {
+    schema_version: 1,
+    timezone: 'Asia/Shanghai',
     updated_at: nowIso,
     latest_date: indexDates.length ? indexDates[0].date : beijingDayKey(Date.now()),
     days,
