@@ -5,17 +5,20 @@ name: 云端扫描新作（移动端静态快照）
 #
 # 注意：GitHub Actions 的 cron 使用 UTC，且为 best-effort（高峰期常延迟 5~30 分钟）。
 # 下面所有 cron 已换算为北京时间 = UTC + 8。
+#
+# 实测：云端 /artist/album 每次约 4 秒（瓶颈在 runner 到网易的网络路径），
+#       并发 16 时全量 9608 艺人约需 44 分钟。因此频率不宜过密，否则会互相排队。
 
 on:
   schedule:
-    # 北京时间 00:05 / 00:25 / 00:45（= 前一天 UTC 16:05/16:25/16:45）—— 过零点密集出结果
-    - cron: '5,25,45 16 * * *'
-    # 北京时间 01:05（= UTC 17:05）
-    - cron: '5 17 * * *'
-    # 北京时间 02:00 / 04:00 / 06:00（= 前一天 UTC 18:00/20:00/22:00）
-    - cron: '0 18,20,22 * * *'
-    # 北京时间 08:00 ~ 22:00 每 2 小时（= UTC 00:00 ~ 14:00 每 2 小时）
-    - cron: '0 0,2,4,6,8,10,12,14 * * *'
+    # 北京时间 00:05（= 前一天 UTC 16:05）—— 过零点开跑，约 00:50 出结果
+    - cron: '5 16 * * *'
+    # 北京时间 00:50（= 前一天 UTC 16:50）—— 兜底重跑一次
+    - cron: '50 16 * * *'
+    # 北京时间 04:00 / 07:00（= 前一天 UTC 20:00 / 23:00）
+    - cron: '0 20,23 * * *'
+    # 北京时间 10:00 / 13:00 / 16:00 / 19:00 / 22:00（= UTC 02/05/08/11/14）
+    - cron: '0 2,5,8,11,14 * * *'
   workflow_dispatch:
     inputs:
       max_artists:
@@ -23,9 +26,9 @@ on:
         required: false
         default: '0'
       concurrency:
-        description: '并发数（默认 6）'
+        description: '并发数（默认 16）'
         required: false
-        default: '6'
+        default: '16'
 
 permissions:
   contents: write
@@ -38,7 +41,7 @@ concurrency:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - name: 拉取 gh-pages
         uses: actions/checkout@v4
@@ -58,6 +61,9 @@ jobs:
           for i in $(seq 1 60); do
             if curl -sf "http://127.0.0.1:3100/album/new?area=ALL&limit=1" > /dev/null; then
               echo "NeteaseCloudMusicApi 已就绪（${i}0s 内）"
+              for n in 1 2 3; do
+                echo "  第 $n 次 /artist/album 上游耗时：$(curl -s -o /dev/null -w '%{time_total}s' 'http://127.0.0.1:3100/artist/album?id=13430&limit=100')"
+              done
               exit 0
             fi
             sleep 2
@@ -76,7 +82,7 @@ jobs:
             --out . \
             --api http://127.0.0.1:3100 \
             --days 7 \
-            --concurrency "${{ github.event.inputs.concurrency || 6 }}" \
+            --concurrency "${{ github.event.inputs.concurrency || 16 }}" \
             --max-artists "${{ github.event.inputs.max_artists || 0 }}"
 
       - name: 提交快照
