@@ -2529,6 +2529,8 @@
       const available = new Set(dates.map(d => d.date));
       if(preferredDay && available.has(preferredDay)) __staticManualDay = preferredDay;
       if(__staticManualDay && !available.has(__staticManualDay)) __staticManualDay = '';
+      // 选回最新一天就等于「跟随最新快照」，重新允许自动刷新
+      if(__staticManualDay && __staticManualDay === dates[0].date) __staticManualDay = '';
       const dayIndex = __staticCurrentIndex();
       const day = dates[dayIndex < 0 ? 0 : dayIndex].date;
       const rangeDays = __staticRangeDays();
