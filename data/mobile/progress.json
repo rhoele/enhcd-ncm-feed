@@ -1,1 +1,1 @@
-{"schema_version":1,"timezone":"Asia/Shanghai","scanning":true,"phase":"new","done":3000,"total":9608,"percent":22,"hits":526,"ok":2999,"fail":1,"started_at":"2026-10-16T17:20:48.787Z","updated_at":"2026-10-16T17:31:31.786Z"}
+{"schema_version":1,"timezone":"Asia/Shanghai","scanning":false,"phase":"done","done":9608,"total":9608,"percent":100,"hits":991,"ok":9604,"fail":4,"started_at":"2026-10-16T17:58:39.056Z","updated_at":"2026-10-16T18:25:37.872Z"}
