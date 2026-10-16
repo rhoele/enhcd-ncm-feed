@@ -96,6 +96,31 @@ let pushInFlight = false;
 let pushCommitReady = false;
 let lastPushAt = 0;
 
+function cleanupGitRebaseState(git) {
+  try { git('rebase', '--abort'); } catch {}
+  let gitDir = '';
+  try {
+    const rawGitDir = (git('rev-parse', '--git-dir') || '').trim();
+    gitDir = rawGitDir ? (path.isAbsolute(rawGitDir) ? rawGitDir : path.join(DST_DIR, rawGitDir)) : '';
+  } catch {}
+  if (!gitDir) return;
+  for (const name of ['rebase-merge', 'rebase-apply']) {
+    try { fs.rmSync(path.join(gitDir, name), { recursive: true, force: true }); } catch {}
+  }
+}
+
+function syncBranchForRetry(git, branch) {
+  cleanupGitRebaseState(git);
+  try { git('fetch', 'origin', branch); } catch {}
+  try {
+    git('rebase', 'origin/' + branch);
+    return true;
+  } catch {
+    cleanupGitRebaseState(git);
+    return false;
+  }
+}
+
 function publishProgress(message, force) {
   if (!PUSH_EVERY_MS || pushInFlight) return;
   if (!force && lastPushAt && Date.now() - lastPushAt < PUSH_EVERY_MS) return;
@@ -103,6 +128,7 @@ function publishProgress(message, force) {
   lastPushAt = Date.now();
   const git = (...a) => execFileSync('git', ['-C', DST_DIR, ...a], { stdio: 'pipe', encoding: 'utf8' });
   try {
+    cleanupGitRebaseState(git);
     let branch = 'gh-pages';
     try { branch = (git('rev-parse', '--abbrev-ref', 'HEAD') || '').trim() || branch; } catch {}
     git('add', '--', 'data/mobile');
@@ -123,7 +149,7 @@ function publishProgress(message, force) {
         pushed = true;
       } catch (e) {
         if (attempt === 3) throw e;
-        try { git('fetch', 'origin', branch); git('rebase', 'origin/' + branch); } catch {}
+        syncBranchForRetry(git, branch);
       }
     }
     console.log('  [增量发布] ' + message);
