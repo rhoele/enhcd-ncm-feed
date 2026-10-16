@@ -3,11 +3,17 @@ name: 云端扫描新作（移动端静态快照）
 # 逐艺人调用 /artist/album 抓取近 7 天新作，产出 data/mobile/ 静态快照并提交回 gh-pages。
 # 移动端只读这些同源 JSON，彻底规避「HTTPS 页面请求 http:// 本地后端」的混合内容拦截。
 #
+# 「合辑参与」（关注艺人出现在他人专辑里）成本远高于新作（每位艺人约 6 个请求，
+# 全量一次要 6.9 万请求 ≈ 3 小时），因此按 --compilation-shards 分片轮转：每次只扫
+# 1/N 的艺人，已确认发行时间的专辑写进 data/mobile/album-dates.json 跨次复用，
+# 游标存在 index.json 的 compilation_shard 里逐次前进。每天 9 次 cron 与 8 片互质，可覆盖全部。
+#
 # 注意：GitHub Actions 的 cron 使用 UTC，且为 best-effort（高峰期常延迟 5~30 分钟）。
 # 下面所有 cron 已换算为北京时间 = UTC + 8。
 #
 # 实测：云端 /artist/album 每次约 4 秒（瓶颈在 runner 到网易的网络路径），
 #       并发 16 时全量 9608 艺人约需 44 分钟。因此频率不宜过密，否则会互相排队。
+#       job 时限 90 分钟：新作约 44 分钟 + 合辑分片（预算 25 分钟）仍有富余。
 
 on:
   schedule:
@@ -29,6 +35,10 @@ on:
         description: '并发数（默认 16）'
         required: false
         default: '16'
+      compilation_shards:
+        description: '合辑分片数（默认 8，每次只扫 1/N 的艺人轮转）'
+        required: false
+        default: '8'
 
 permissions:
   contents: write
@@ -83,6 +93,8 @@ jobs:
             --api http://127.0.0.1:3100 \
             --days 7 \
             --concurrency "${{ github.event.inputs.concurrency || 16 }}" \
+            --compilation-shards "${{ github.event.inputs.compilation_shards || 8 }}" \
+            --compilation-budget-sec 1500 \
             --max-artists "${{ github.event.inputs.max_artists || 0 }}"
 
       - name: 提交快照

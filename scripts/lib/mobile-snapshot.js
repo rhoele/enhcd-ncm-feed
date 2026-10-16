@@ -9,7 +9,12 @@
  * 输出格式：
  *   data/mobile/index.json         { updated_at, latest_date, days, artist_count, album_count, dates:[{date,count,generated_at}] }
  *   data/mobile/YYYY-MM-DD.json    { date, generated_at, count, items:[...] }
- *   data/mobile/artists.json       { updated_at, count, ids:[...] }   ← 云端扫描的艺人清单输入
+ *   data/mobile/artists.json       { updated_at, count, ids:[...] }        ← 云端扫描的艺人清单输入
+ *   data/mobile/album-dates.json   { updated_at, count, dates:{id:ts} }    ← 「合辑参与」的专辑日期缓存
+ *
+ * 每个日期文件里的 items 分两类，靠 resultTab 区分：
+ *   resultTab='new'          关注的艺人自己的发行（collector.add）
+ *   resultTab='compilation'  关注的艺人出现在他人名下专辑里（collector.addCompilation）
  */
 const fs = require('fs');
 const path = require('path');
@@ -20,8 +25,10 @@ const VA_PATTERN = /^(various\s*artists|v\.?\s*a\.?|群星|华语群星|va)$/i;
 
 const ARTISTS_FILE = 'artists.json';
 const INDEX_FILE = 'index.json';
+// 专辑发行日期缓存（albumId -> publishTime）：用于跳过「合辑参与」里大量早已发行的候选专辑
+const ALBUM_DATES_FILE = 'album-dates.json';
 // 清理过期快照时需要保留下来的非日期文件
-const KEEP_FILES = new Set([INDEX_FILE, ARTISTS_FILE]);
+const KEEP_FILES = new Set([INDEX_FILE, ARTISTS_FILE, ALBUM_DATES_FILE]);
 
 function beijingDayKey(ts) {
   return new Date(Number(ts) + BJ_OFFSET_MS).toISOString().slice(0, 10);
@@ -104,6 +111,91 @@ function createCollector(days) {
         isOwnedRelease: !isVA
       });
       return true;
+    },
+
+    /**
+     * 收录一条「合辑参与」：关注的艺人出现在他人名下（或 Various Artists）的专辑里。
+     * 与 add() 的区别是产出 resultTab='compilation'，前端会渲染到「扫描合辑」标签页。
+     * 同一张专辑会被多个关注艺人命中，这里合并艺人名与曲目。
+     *
+     * @param {object} entry
+     *   id            专辑 id（必填）
+     *   name/picUrl   专辑名与封面
+     *   publishTime   发行时间（必填，需落在窗口内）
+     *   artistId/artistName  命中的关注艺人（artistName 用于「扫描来源艺人」）
+     *   albumArtists  专辑实际艺人名数组（用于「实际艺术家」）
+     *   company       厂牌
+     *   track         { id, name, artists, link } 命中的单曲
+     * @returns {boolean} 本次是否新收录该专辑
+     */
+    addCompilation(entry) {
+      const albumId = Number(entry && entry.id) || 0;
+      const ts = Number(entry && entry.publishTime) || 0;
+      if (!albumId || !ts) return false;
+      const day = beijingDayKey(ts);
+      if (!self.wanted.has(day)) return false;
+
+      const aid = Number(entry.artistId) || 0;
+      const sourceName = String(entry.artistName || '').trim();
+      const albumArtists = Array.isArray(entry.albumArtists)
+        ? entry.albumArtists.map(n => String(n || '').trim()).filter(Boolean)
+        : [];
+      const label = String(entry.company || '').trim();
+
+      if (!self.byDay.has(day)) self.byDay.set(day, new Map());
+      const bucket = self.byDay.get(day);
+      let item = bucket.get(albumId);
+      let created = false;
+      if (!item) {
+        self.hitCount += 1;
+        created = true;
+        item = {
+          id: albumId,
+          name: String(entry.name || '未知专辑'),
+          picUrl: String(entry.picUrl || ''),
+          publishTime: ts,
+          artistName: sourceName,
+          artistId: aid,
+          artistIds: aid ? [aid] : [],
+          link: String(entry.link || ('https://music.163.com/#/album?id=' + albumId)),
+          source: '云端快照',
+          type: '扫描合辑',
+          tracks: [],
+          trackCount: 0,
+          resultTab: 'compilation',
+          label,
+          company: label,
+          actualArtistNames: albumArtists,
+          sourceArtistNames: [],
+          isOwnedRelease: false
+        };
+        bucket.set(albumId, item);
+      }
+
+      if (aid && !item.artistIds.includes(aid)) item.artistIds.push(aid);
+      if (!item.actualArtistNames.length && albumArtists.length) item.actualArtistNames = albumArtists;
+      if (!item.label && label) {
+        item.label = label;
+        item.company = label;
+      }
+      if (sourceName) {
+        const names = new Set(String(item.artistName || '').split(' / ').map(n => n.trim()).filter(Boolean));
+        names.add(sourceName);
+        item.artistName = Array.from(names).join(' / ');
+        if (!item.sourceArtistNames.includes(sourceName)) item.sourceArtistNames.push(sourceName);
+      }
+      const track = entry.track;
+      const trackId = Number(track && track.id) || 0;
+      if (trackId > 0 && !item.tracks.some(t => Number(t.id) === trackId)) {
+        item.tracks.push({
+          id: trackId,
+          name: String(track.name || '未命名单曲'),
+          artists: String(track.artists || ''),
+          link: String(track.link || '')
+        });
+      }
+      item.trackCount = item.tracks.length;
+      return created;
     }
   };
   return self;
@@ -139,7 +231,8 @@ function writeSnapshot(opts) {
     days,
     artist_count: artistCount,
     album_count: albumCount,
-    dates: indexDates
+    dates: indexDates,
+    ...(opts.extra && typeof opts.extra === 'object' ? opts.extra : {})
   };
   fs.writeFileSync(path.join(dstMobileDir, INDEX_FILE), JSON.stringify(indexPayload, null, 2), 'utf8');
 
@@ -168,8 +261,11 @@ function writeArtistIds(dstMobileDir, ids) {
   return payload;
 }
 
-/** 读取已有的单日快照，合并进收集器（用于部分扫描时不抹掉线上已有数据） */
-function loadExistingInto(dstMobileDir, collector) {
+/**
+ * 读取已有的单日快照，合并进收集器（用于部分扫描时不抹掉线上已有数据）
+ * @param {function} [filter] 可选过滤：只有返回 true 的条目才会被合并
+ */
+function loadExistingInto(dstMobileDir, collector, filter) {
   let merged = 0;
   if (!fs.existsSync(dstMobileDir)) return merged;
   for (const day of collector.wanted) {
@@ -180,10 +276,40 @@ function loadExistingInto(dstMobileDir, collector) {
     const items = Array.isArray(payload) ? payload : (payload && payload.items);
     if (!Array.isArray(items)) continue;
     for (const item of items) {
+      if (typeof filter === 'function' && !filter(item)) continue;
       if (collector.seed(item)) merged += 1;
     }
   }
   return merged;
+}
+
+/** 读取专辑发行日期缓存（albumId -> publishTime） */
+function readAlbumDates(dstMobileDir) {
+  const cache = new Map();
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dstMobileDir, ALBUM_DATES_FILE), 'utf8'));
+    const dates = raw && typeof raw.dates === 'object' && raw.dates ? raw.dates : {};
+    for (const key of Object.keys(dates)) {
+      const id = Number(key);
+      const ts = Number(dates[key]);
+      if (id > 0 && ts > 0) cache.set(id, ts);
+    }
+  } catch {}
+  return cache;
+}
+
+/** 写出专辑发行日期缓存；返回条目数 */
+function writeAlbumDates(dstMobileDir, cache) {
+  const dates = {};
+  const ids = Array.from(cache.keys()).sort((a, b) => a - b);
+  for (const id of ids) dates[id] = cache.get(id);
+  fs.mkdirSync(dstMobileDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dstMobileDir, ALBUM_DATES_FILE),
+    JSON.stringify({ updated_at: new Date().toISOString(), count: ids.length, dates }, null, 0),
+    'utf8'
+  );
+  return ids.length;
 }
 
 /** 读取艺人清单，兼容 {ids:[]} 与裸数组两种写法 */
@@ -205,11 +331,14 @@ module.exports = {
   VA_PATTERN,
   ARTISTS_FILE,
   INDEX_FILE,
+  ALBUM_DATES_FILE,
   beijingDayKey,
   recentDayList,
   createCollector,
   writeSnapshot,
   writeArtistIds,
   readArtistIds,
-  loadExistingInto
+  loadExistingInto,
+  readAlbumDates,
+  writeAlbumDates
 };
