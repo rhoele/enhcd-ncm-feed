@@ -117,6 +117,18 @@ jobs:
           else
             git commit -m "chore(snapshot): 云端扫描 $(TZ=Asia/Shanghai date +'%Y-%m-%d %H:%M')"
           fi
-          # 扫描过程中已用 --push-every 增量推送（同一个提交反复 amend），这里兜底同步一次远端
-          git pull --rebase --autostash origin gh-pages || true
-          git push origin gh-pages
+          # 扫描过程中已用 --push-every 增量推送（同一个提交反复 amend），这里兜底同步一次远端。
+          # 增量推送会改写远端历史，所以推送失败就先拉平再试；网络抖动靠重试兜住。
+          for i in 1 2 3 4 5; do
+            if git push origin gh-pages; then
+              echo "快照已推送（第 $i 次尝试）"
+              exit 0
+            fi
+            echo "第 $i 次推送失败，同步远端后重试…"
+            git rebase --abort >/dev/null 2>&1 || true
+            git fetch origin gh-pages || true
+            git rebase origin/gh-pages || true
+            sleep $((i * 5))
+          done
+          echo "::error::快照推送连续 5 次失败"
+          exit 1

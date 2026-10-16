@@ -107,7 +107,9 @@
 00:05  00:50  04:00  07:00  10:00  13:00  16:00  19:00  22:00
 ```
 
-00:05 那次保证「过 0 点就能看到当天新作」，00:50 再兜底一次（Actions 的 cron 是 best-effort，高峰期常延迟 5~30 分钟）。
+00:05 那次保证「过 0 点就能看到当天新作」，00:50 再兜底一次。
+
+> ⚠️ **Actions 的 `schedule` 只是 best-effort**：实测 9 个 cron 一天只真正触发 4 次，且比原定时刻晚 50~90 分钟，还偶发被取消。**想准点，必须用外部定时器精确触发 `workflow_dispatch`**，见下节。仓库里的 cron 保留作为兜底。
 
 **两阶段扫描**：
 
@@ -127,6 +129,39 @@ job 时限 90 分钟，合辑阶段另有 1 500 秒硬预算，超时即停、�
 扫描过程中每 30 秒增量落盘一次（`writeSnapshot --prune:false` + `progress.json`），并每 3 分钟（`--push-every 180`）把 `data/mobile` 推送一次，让页面能立刻看到当天卡片与进度。收尾那次才用 `--prune:true` 清理窗口外的旧日期文件，同时 `progress.json` 被列入保留名单、不会被删。
 
 **建议配置 Secret**：`NETEASE_MUSIC_U`（网易云 `MUSIC_U` Cookie 值）。带上登录态能显著降低匿名接口的限流与风控概率。
+
+### 准点触发：外部定时器 → `workflow_dispatch`
+
+`workflow_dispatch` 是**排队即跑**（秒级启动），不像 `schedule` 会被限流，所以让外部定时器来点这个按钮才是准点方案。
+
+1. **建一个细粒度 PAT**：GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → 只勾选本仓库 `rhoele/enhcd-ncm-feed`，权限只给 **Actions: Read and write**，设好过期时间。
+2. **在外部定时器里建一个 POST 任务**（如 [cron-job.org](https://cron-job.org)，免费）：
+
+   | 项 | 值 |
+   | --- | --- |
+   | URL | `https://api.github.com/repos/rhoele/enhcd-ncm-feed/actions/workflows/scan.yml/dispatches` |
+   | Method | `POST` |
+   | Header `Authorization` | `Bearer <你的 PAT>` |
+   | Header `Accept` | `application/vnd.github+json` |
+   | Header `X-GitHub-Api-Version` | `2022-11-28` |
+   | Header `User-Agent` | `naf-cron` |
+   | Body | `{"ref":"gh-pages"}` |
+   | 时区 / 时间 | `Asia/Shanghai`，00:00、03:00、06:00、09:00、12:00、15:00、18:00、21:00 |
+
+   成功返回 `204 No Content`。
+
+3. **本地验证一次**（PowerShell，把 `<PAT>` 换成你的 token）：
+
+   ```powershell
+   Invoke-WebRequest -Method Post `
+     -Uri 'https://api.github.com/repos/rhoele/enhcd-ncm-feed/actions/workflows/scan.yml/dispatches' `
+     -Headers @{ Authorization = 'Bearer <PAT>'; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28'; 'User-Agent' = 'naf-manual' } `
+     -ContentType 'application/json' -Body '{"ref":"gh-pages"}'
+   ```
+
+不想把 PAT 放在第三方服务上，也可以用 **Google Apps Script** 的时间触发器发同样的 POST（脚本由你自己持有，不经过第三方）。
+
+> 注意：并发组 `cloud-scan` 同一时刻只跑一个 job，所以外部定时器不必再叠加错峰逻辑；触发过密只会排队。
 
 ---
 

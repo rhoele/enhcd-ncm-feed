@@ -114,13 +114,17 @@ function publishProgress(message, force) {
       pushCommitReady = true;
     }
     if (!staged && !pushCommitReady) return;
-    try {
-      git('push', '--force-with-lease', 'origin', 'HEAD:' + branch);
-    } catch {
-      // 租约失效（远端被别人推过）：同步远端后把自己的提交 rebase 上去，再普通推送一次
-      git('fetch', 'origin', branch);
-      git('rebase', 'origin/' + branch);
-      git('push', 'origin', 'HEAD:' + branch);
+    // 推送最多重试 3 轮：网络抖动直接重试，租约失效则先同步远端再把自己的提交 rebase 上去。
+    // 单轮失败不再让这次增量白丢——数据已在本地，下一轮 flush 会连它一起推。
+    let pushed = false;
+    for (let attempt = 1; attempt <= 3 && !pushed; attempt++) {
+      try {
+        git('push', '--force-with-lease', 'origin', 'HEAD:' + branch);
+        pushed = true;
+      } catch (e) {
+        if (attempt === 3) throw e;
+        try { git('fetch', 'origin', branch); git('rebase', 'origin/' + branch); } catch {}
+      }
     }
     console.log('  [增量发布] ' + message);
   } catch (e) {
