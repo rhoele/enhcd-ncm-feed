@@ -109,7 +109,7 @@
 
 00:05 那次保证「过 0 点就能看到当天新作」，00:50 再兜底一次。
 
-> ⚠️ **Actions 的 `schedule` 只是 best-effort**：实测 9 个 cron 一天只真正触发 4 次，且比原定时刻晚 50~90 分钟，还偶发被取消。**想准点，必须用外部定时器精确触发 `workflow_dispatch`**，见下节。仓库里的 cron 保留作为兜底。
+> ⚠️ **Actions 的 `schedule` 只是 best-effort**：实测 9 个 cron 一天只真正触发 4 次，且比原定时刻晚 50~90 分钟，还偶发被取消。**想准点，不要靠继续加 cron，改用内置的 `tick.yml` 高频补触发**，见下节。仓库里的 cron 保留作为兜底。
 
 **两阶段扫描**：
 
@@ -130,9 +130,23 @@ job 时限 90 分钟，合辑阶段另有 1 500 秒硬预算，超时即停、�
 
 **建议配置 Secret**：`NETEASE_MUSIC_U`（网易云 `MUSIC_U` Cookie 值）。带上登录态能显著降低匿名接口的限流与风控概率。
 
-### 准点触发：外部定时器 → `workflow_dispatch`
+### 准点触发：内置 tick 工作流（推荐，零依赖）
 
-`workflow_dispatch` 是**排队即跑**（秒级启动），不像 `schedule` 会被限流，所以让外部定时器来点这个按钮才是准点方案。
+`workflow_dispatch` 是**排队即跑**（秒级启动），不像 `schedule` 会被限流。所以稳的做法是：**用高频 tick 去按需点这个按钮**，而不是继续加指定时刻的 cron。
+
+[`.github/workflows/tick.yml`](.github/workflows/tick.yml) 每 5 分钟跑一次（`*/5 * * * *`），逻辑是：
+
+1. `scan.yml` 有排队/运行中的任务 → 什么都不做；
+2. 北京时间的「今天」还没有任何一次扫描启动 → 立刻补触发一次（**这条保证过 0 点一定会开始扫当天**）；
+3. 否则距上次启动超过 `MIN_GAP_MINUTES`（默认 150 分钟）才再补一次。
+
+它用的是仓库自带的 `GITHUB_TOKEN`（`permissions: actions: write`）。官方文档说明 `workflow_dispatch` / `repository_dispatch` 是「`GITHUB_TOKEN` 触发的事件不产生新运行」这条限制的**例外**，所以**不需要 PAT，也不需要 cron-job.org 之类的外部定时器**。
+
+验证：Actions → 「准点触发（按需补一次扫描）」→ Run workflow → `force` 填 `true`，应立刻看到 `scan.yml` 起一个新运行。
+
+### 可选叠加：外部定时器（想精确到秒时）
+
+如果还想要精确到秒的触发，可以再叠一层外部定时器 POST `workflow_dispatch`（这一步需要**细粒度 PAT**）：
 
 1. **建一个细粒度 PAT**：GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → 只勾选本仓库 `rhoele/enhcd-ncm-feed`，权限只给 **Actions: Read and write**，设好过期时间。
 2. **在外部定时器里建一个 POST 任务**（如 [cron-job.org](https://cron-job.org)，免费）：

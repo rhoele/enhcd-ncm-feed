@@ -1,0 +1,83 @@
+name: 准点触发（按需补一次扫描）
+
+# 为什么需要这个：
+# GitHub 的 schedule 是 best-effort —— 指定时刻的 cron 实测会晚 50~90 分钟，甚至整次不触发
+# （2026-10-16 一天 9 个 cron 只真正跑了 4 个，10-17 零点那两次直接没触发）。
+# 对付「指定时刻不可靠」的办法不是继续加 cron，而是换成高频 tick + 按需补触发：
+#   1. 有扫描在排队/运行中 → 什么都不做；
+#   2. 北京时间的「今天」还没有任何一次扫描启动 → 立刻补一次（保证过 0 点就开始扫当天）；
+#   3. 否则只有距上次启动超过 MIN_GAP_MINUTES 分钟才补一次（避免重复消耗网易接口）。
+#
+# 用 GITHUB_TOKEN 触发 workflow_dispatch 是官方允许的例外，不会形成递归，
+# 所以这个方案不需要额外 PAT，也不需要 cron-job.org 之类的外部定时器：
+# https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+on:
+  schedule:
+    # 每 5 分钟一次（cron 最小粒度）。单次触发不可靠没关系——一天 288 次尝试，
+    # 只要其中一次落在「今天还没扫过」的窗口里就能补上。
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: '忽略间隔判断，强制触发一次扫描（验证用）'
+        required: false
+        default: 'false'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: scan-tick
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MIN_GAP_MINUTES: '150'
+    steps:
+      - name: 按需补触发云端扫描
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "force=true，直接触发"
+            gh workflow run scan.yml --ref gh-pages
+            echo "已触发 scan.yml"
+            exit 0
+          fi
+
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/scan.yml/runs?per_page=20" > /tmp/runs.json
+
+          active=$(jq -r '[.workflow_runs[] | select(.status != "completed")] | length' /tmp/runs.json)
+          if [ "$active" != "0" ]; then
+            echo "已有 $active 个扫描在排队/运行中，跳过"
+            exit 0
+          fi
+
+          today_bj=$(TZ=Asia/Shanghai date +%F)
+          started_today=$(jq -r --arg d "$today_bj" \
+            '[.workflow_runs[] | select((.created_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601 + 28800 | strftime("%Y-%m-%d")) == $d)] | length' \
+            /tmp/runs.json)
+          last=$(jq -r '.workflow_runs[0].created_at // empty' /tmp/runs.json)
+
+          echo "北京时间今天：$today_bj"
+          echo "今天已启动扫描：$started_today 次；最近一次启动：${last:-无}"
+
+          if [ "$started_today" = "0" ]; then
+            echo "→ 今天还没有扫描启动，补触发一次"
+          else
+            age=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 60 ))
+            echo "→ 距上次启动 $age 分钟（阈值 ${MIN_GAP_MINUTES} 分钟）"
+            if [ "$age" -lt "$MIN_GAP_MINUTES" ]; then
+              echo "间隔未到，跳过"
+              exit 0
+            fi
+          fi
+
+          gh workflow run scan.yml --ref gh-pages
+          echo "已触发 scan.yml"
