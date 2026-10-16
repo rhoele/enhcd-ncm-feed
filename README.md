@@ -204,12 +204,12 @@ node scripts/export-mobile-snapshot.js --days 7 --va-api http://127.0.0.1:8001
 - 设置页保留原来的 WebView 界面（扫码登录、导入 IDs、导入设置文件），供高级用法使用；
 - 通知去重键与快照格式对齐（见上文 `netease:album:<id>:<publishTime>`），为后续「新歌推送」预留。
 
-构建：
+构建（工程内已带 Gradle Wrapper，首次构建会自动下载 Gradle 8.7）：
 
 ```bash
 cd android-app
-gradle assembleDebug        # 或 gradlew assembleDebug
-# 产物：app/build/outputs/apk/debug/app-debug.apk
+gradlew.bat assembleDebug     # macOS / Linux 用 ./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 发布签名读根目录的 `keystore.properties` + `keystore/naf-release.keystore`（这两个文件不入库）。
