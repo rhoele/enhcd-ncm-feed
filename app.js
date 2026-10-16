@@ -89,6 +89,10 @@
     } catch {}
     return 'data/mobile';
   }
+  // 静态快照的日期回看状态（声明必须早于启动时的首次渲染）
+  let __staticSnapshotDates = [];   // [{date, count}]，由新到旧
+  let __staticManualDay = '';       // 用户手动选中的日期；空 = 跟随最新一天
+  let __staticIndexStamp = '';      // 上次渲染时的 index.json updated_at，用于轮询判断是否需要刷新
   function getScanBackendBase() {
     try {
       const s = loadSettings();
@@ -172,6 +176,11 @@
     headerStatAlbums: document.getElementById('headerStatAlbums'),
     headerStatCheckedAlbums: document.getElementById('headerStatCheckedAlbums'),
     headerStatElapsed: document.getElementById('headerStatElapsed'),
+    snapshotNav: document.getElementById('snapshotNav'),
+    snapshotPrev: document.getElementById('snapshotPrev'),
+    snapshotNext: document.getElementById('snapshotNext'),
+    snapshotDate: document.getElementById('snapshotDate'),
+    snapshotRange: document.getElementById('snapshotRange'),
     openWeb: document.getElementById('openWeb'),
     // Spotify 扩展
     spotifyClientId: document.getElementById('spotifyClientId'),
@@ -1747,6 +1756,7 @@
   }catch{}
   runDailyCheck();
   startMidnightChecker();
+  startStaticSnapshotPoller();
 
   function loadSettings(){
     try{
@@ -2457,7 +2467,49 @@
   }
 
   // ===== 静态快照渲染：从 data/mobile/ 读取已抓取好的结果（只读） =====
-  async function __renderStaticSnapshot(){
+  // 云端快照按天分文件（YYYY-MM-DD.json），索引 index.json 的 dates[] 由新到旧排列。
+  // 默认展示最新一天（产出端保证「当天」一定在 dates[] 里，哪怕 0 条），
+  // 并支持「日期 + 时间范围（天）」回看：从选中日往前叠加 N 天，同一张专辑只保留一条。
+  function __formatSnapshotStamp(iso){
+    const ts = Date.parse(String(iso || ''));
+    if(!Number.isFinite(ts)) return '';
+    try{
+      return new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(new Date(ts));
+    }catch{ return ''; }
+  }
+
+  function __staticCurrentIndex(){
+    const list = __staticSnapshotDates;
+    if(!list.length) return -1;
+    const cur = __staticManualDay || list[0].date;
+    return list.findIndex(d => d.date === cur);
+  }
+
+  function __staticRangeDays(){
+    return clampInt(els.snapshotRange?.value, 1, 30, 1);
+  }
+
+  function __updateStaticSnapshotNav(){
+    const nav = els.snapshotNav;
+    if(!nav) return;
+    nav.hidden = !__isStaticMode();
+    const list = __staticSnapshotDates;
+    if(!list.length) return;
+    const i = __staticCurrentIndex();
+    if(els.snapshotDate){
+      els.snapshotDate.min = list[list.length - 1].date;
+      els.snapshotDate.max = list[0].date;
+      els.snapshotDate.value = list[i < 0 ? 0 : i].date;
+    }
+    // dates[] 由新到旧：+1 = 更早的一天
+    if(els.snapshotPrev) els.snapshotPrev.disabled = !(i >= 0 && i + 1 < list.length);
+    if(els.snapshotNext) els.snapshotNext.disabled = !(i > 0);
+  }
+
+  async function __renderStaticSnapshot(preferredDay){
     const statusEl = document.getElementById('progressText') || document.getElementById('loadingText');
     const base = __getStaticSnapshotBase();
     try{
@@ -2465,18 +2517,45 @@
       const idxRes = await fetch(base + '/index.json', { cache: 'no-store' });
       if(!idxRes.ok) throw new Error('index.json HTTP ' + idxRes.status);
       const idx = await idxRes.json();
-      const days = Array.isArray(idx?.dates) ? idx.dates.map(d => String(d?.date || '')).filter(Boolean) : [];
-      if(!days.length) throw new Error('快照索引为空');
-      const day = days[0];
-      const dayRes = await fetch(base + '/' + day + '.json', { cache: 'no-store' });
-      if(!dayRes.ok) throw new Error(day + '.json HTTP ' + dayRes.status);
-      const payload = await dayRes.json();
-      const items = normalizeEnhancedBackendResults(Array.isArray(payload) ? payload : payload?.items);
+      __staticIndexStamp = String(idx?.updated_at || '');
+      let dates = Array.isArray(idx?.dates)
+        ? idx.dates.map(d => ({ date: String(d?.date || ''), count: Number(d?.count || 0) })).filter(d => d.date)
+        : [];
+      if(!dates.length && idx?.latest_date) dates = [{ date: String(idx.latest_date), count: 0 }];
+      if(!dates.length) throw new Error('快照索引为空');
+      dates.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      __staticSnapshotDates = dates;
 
-      const cfg = loadSettings();
-      const baseDate = (cfg.targetDate ? new Date(cfg.targetDate) : new Date());
-      baseDate.setHours(0,0,0,0);
-      const rangedKey = buildEnhancedRangeCacheKey(baseDate, cfg.daysRange);
+      const available = new Set(dates.map(d => d.date));
+      if(preferredDay && available.has(preferredDay)) __staticManualDay = preferredDay;
+      if(__staticManualDay && !available.has(__staticManualDay)) __staticManualDay = '';
+      const dayIndex = __staticCurrentIndex();
+      const day = dates[dayIndex < 0 ? 0 : dayIndex].date;
+      const rangeDays = __staticRangeDays();
+      // 从选中日往前取 N 天，只保留索引里真实存在的日期
+      const wanted = dates.slice(dayIndex < 0 ? 0 : dayIndex, (dayIndex < 0 ? 0 : dayIndex) + rangeDays).map(d => d.date);
+
+      __updateStaticSnapshotNav();
+
+      const items = [];
+      const seenKeys = new Set();
+      for(const d of wanted){
+        const dayRes = await fetch(base + '/' + d + '.json', { cache: 'no-store' });
+        // 单个日期文件缺失不该让整页报错（例如索引刚更新、某天还没产出）
+        if(!dayRes.ok) continue;
+        const payload = await dayRes.json();
+        const raw = Array.isArray(payload) ? payload : payload?.items;
+        for(const item of normalizeEnhancedBackendResults(raw)){
+          const key = getEnhancedRenderKey(item);
+          if(seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          items.push(item);
+        }
+      }
+      items.sort((a, b) => Number(b.publishTime || 0) - Number(a.publishTime || 0));
+
+      const baseDate = new Date(day + 'T00:00:00');
+      const rangedKey = buildEnhancedRangeCacheKey(baseDate, rangeDays);
 
       __enhancedUiState.rangeCacheKey = rangedKey;
       setEnhancedItemsByTab(ENHANCED_TAB_NEW, items.filter(item => classifyEnhancedItem(item) === ENHANCED_TAB_NEW));
@@ -2490,21 +2569,71 @@
         elapsedText: '快照'
       }, false);
 
+      const scopeText = wanted.length > 1
+        ? `近 ${wanted.length} 天（${wanted[wanted.length - 1]} ~ ${day}）`
+        : day;
+      const updatedText = __formatSnapshotStamp(idx?.updated_at);
+
       if(items.length){
         renderEnhancedPanelsFromState();
         activateEnhancedTab(__enhancedUiState.activeTab, { preserveCurrentScroll: false, restoreScroll: false });
         persistEnhancedUiState();
         try{ window.NAF_STORAGE.setItem(rangedKey, JSON.stringify(items)); }catch{}
-        if(statusEl) statusEl.textContent = `云端快照 ${day} · ${items.length} 张（只读模式）`;
+        if(statusEl) statusEl.textContent = `云端快照 ${scopeText} · ${items.length} 张（只读模式）`
+          + (updatedText ? ` · 更新于 ${updatedText}` : '');
       } else {
-        renderFeedSection(ENHANCED_TAB_NEW, [], `${day} 快照中未发现新作。`);
+        const tip = `${scopeText} 快照中未发现新作。`
+          + (updatedText ? `快照更新于 ${updatedText}，` : '')
+          + (__staticSnapshotDates.length > 1 ? '可切换到前一天查看。' : '');
+        renderFeedSection(ENHANCED_TAB_NEW, [], tip);
         renderFeedSection(ENHANCED_TAB_COMPILATION, [], getEnhancedEmptyMessage(ENHANCED_TAB_COMPILATION, 'empty'));
-        if(statusEl) statusEl.textContent = `云端快照 ${day} · 暂无新作`;
+        if(statusEl) statusEl.textContent = `云端快照 ${scopeText} · 暂无新作（只读模式）`;
       }
     }catch(err){
       if(statusEl) statusEl.textContent = '快照读取失败：' + (err?.message || err);
       console.warn('[StaticSnapshot] 读取失败', err);
     }
+  }
+
+  // 静态快照的日期 / 时间范围控件：切换后只重读快照，不触发任何后端请求
+  (function bindStaticSnapshotNav(){
+    const rerender = (preferredDay) => { __renderStaticSnapshot(preferredDay); };
+    els.snapshotPrev?.addEventListener('click', () => {
+      const i = __staticCurrentIndex();
+      const next = __staticSnapshotDates[i + 1];
+      if(next) rerender(next.date);
+    });
+    els.snapshotNext?.addEventListener('click', () => {
+      const i = __staticCurrentIndex();
+      const next = __staticSnapshotDates[i - 1];
+      if(next) rerender(next.date);
+    });
+    els.snapshotDate?.addEventListener('change', () => {
+      rerender(String(els.snapshotDate.value || ''));
+    });
+    els.snapshotRange?.addEventListener('change', () => {
+      const v = clampInt(els.snapshotRange.value, 1, 30, 1);
+      els.snapshotRange.value = String(v);
+      rerender();
+    });
+  })();
+
+  // 云端快照由 Actions 定时产出（北京时间 00:05 那次约 00:50 出结果）。
+  // 页面长时间开着时定期重读 index.json，发现新快照自动刷新；
+  // 用户手动选过日期则不打扰（继续锁定在所选日期）。
+  function startStaticSnapshotPoller(){
+    if(!__isStaticMode()) return;
+    setInterval(async () => {
+      if(document.hidden || __staticManualDay) return;
+      try{
+        const res = await fetch(__getStaticSnapshotBase() + '/index.json', { cache: 'no-store' });
+        if(!res.ok) return;
+        const idx = await res.json();
+        const stamp = String(idx?.updated_at || '');
+        if(!stamp || stamp === __staticIndexStamp) return;
+        await __renderStaticSnapshot();
+      }catch{}
+    }, 5 * 60 * 1000);
   }
 
   async function runDailyCheck(){

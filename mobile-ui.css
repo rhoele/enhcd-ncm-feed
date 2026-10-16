@@ -22,6 +22,27 @@
 }
 .personal-settings .hint { color: #b8b2c3; line-height: 1.7; }
 #personalError { color: #ffb4ab; overflow-wrap: anywhere; }
+
+/* 静态快照的日期 / 时间范围选择条（只在云端只读模式出现） */
+.snapshot-nav {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-top: 12px; padding: 8px 10px;
+  border: 1px solid var(--border-light); border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.snapshot-nav .snapshot-field {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+}
+.snapshot-nav input[type="date"],
+.snapshot-nav input[type="number"] {
+  min-height: 36px; padding: 4px 8px; border-radius: 10px;
+  border: 1px solid var(--border-light); background: var(--surface-1); color: var(--text-main);
+  font-size: 13px; font-family: inherit;
+}
+.snapshot-nav input[type="number"] { width: 60px; text-align: center; }
+.snapshot-nav .btn { min-height: 36px; padding: 4px 12px; }
+
 @media (max-width: 768px) {
   :root { --text-muted: #a1aabb; --text-secondary: #c0c9d7; }
   body { background-attachment: scroll; }
@@ -35,6 +56,11 @@
   .topbar h1 { font-size: clamp(17px, 4.6vw, 22px); line-height: 1.4; }
   .header-status { font-size: 12px; overflow-wrap: anywhere; }
   .header-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+  .snapshot-nav { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
+  .snapshot-nav .snapshot-field { justify-content: center; }
+  .snapshot-nav input[type="date"], .snapshot-nav input[type="number"] { min-height: 44px; width: 100%; }
+  .snapshot-nav input[type="number"] { max-width: 80px; }
+  .snapshot-nav .btn { min-height: 44px; padding: 8px 10px; }
   .tab-btn { padding: 10px 4px; min-height: 44px; font-size: 13px; transition: none; }
   .tab-btn.is-active { color: var(--md-on-primary); background: var(--md-primary); }
   .actions { width: 100%; gap: 8px; flex-wrap: wrap; }

@@ -214,8 +214,17 @@ function writeSnapshot(opts) {
   const nowIso = new Date().toISOString();
   const indexDates = [];
 
-  for (const day of Array.from(collector.byDay.keys()).sort().reverse()) {
-    const items = Array.from(collector.byDay.get(day).values())
+  // 扫描窗口内的每一天都写进索引（哪怕 0 条）：
+  // 否则新的一天在抓到第一条新作之前不会出现在 dates[] 里，前端「默认显示当天」只能退回昨天，
+  // 看起来就像云端没有进行新一日的扫描。
+  const dayKeys = new Set(collector.wanted || []);
+  for (const day of collector.byDay.keys()) dayKeys.add(day);
+  // 跨零点运行（23:5x 起跑、00:xx 落盘）时，收集器的窗口还停在昨天，这里补上「写出时刻」的当天
+  dayKeys.add(beijingDayKey(Date.now()));
+
+  for (const day of Array.from(dayKeys).sort().reverse()) {
+    const bucket = collector.byDay.get(day);
+    const items = (bucket ? Array.from(bucket.values()) : [])
       .map(item => ({
         ...item,
         // Stable across cache refreshes and tab reclassification for notification deduplication.
