@@ -5,7 +5,7 @@ const path = require('path');
 const os = require('os');
 const vm = require('vm');
 const { NcmReadClient } = require('./lib/ncm-read-client');
-const { createCollector, writeSnapshot } = require('./lib/mobile-snapshot');
+const { createCollector, writeSnapshot, writeProgress, beijingDayKey } = require('./lib/mobile-snapshot');
 
 const album = { code: 200, album: { publishTime: Date.now(), company: 'Test', artists: [{ name: 'Artist' }] } };
 test('parallel album consumers and later enrichment share one request', async () => {
@@ -58,6 +58,36 @@ test('snapshot contract keeps notification identity stable', () => {
     assert.equal(json.schema_version, 1);
     assert.equal(json.timezone, 'Asia/Shanghai');
     assert.equal(json.items[0].releaseKey, 'netease:album:42:' + json.items[0].publishTime);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+// 扫描过程中的增量落盘：prune 必须为 false（否则窗口外的旧日期文件会被误删），
+// 收尾那次 prune 必须保住 progress.json，否则页面读不到「扫描已结束」。
+test('incremental flush keeps out-of-window files and progress.json', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'naf-progress-'));
+  try {
+    const staleDay = path.join(root, '2000-01-01.json');
+    fs.writeFileSync(staleDay, JSON.stringify({ schema_version: 1, items: [] }));
+    const collector = createCollector(7);
+    collector.add({ id: 7, name: 'A', publishTime: Date.now(), artists: ['X'] }, 3, '');
+
+    const index = writeSnapshot({ dstMobileDir: root, collector, days: 7, prune: false }).indexPayload;
+    assert.equal(index.latest_date, beijingDayKey(Date.now()));
+    assert.ok(fs.existsSync(staleDay), 'prune:false 不该删除窗口外的日期文件');
+
+    const progress = writeProgress(root, {
+      scanning: true, phase: 'new', done: 200, total: 9000, percent: 2, hits: 1,
+      started_at: '2026-10-17T00:05:00.000Z'
+    });
+    assert.equal(progress.scanning, true);
+    assert.equal(progress.timezone, 'Asia/Shanghai');
+    assert.equal(progress.phase, 'new');
+    assert.equal(progress.percent, 2);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'progress.json'), 'utf8')).done, 200);
+
+    writeSnapshot({ dstMobileDir: root, collector, days: 7, prune: true });
+    assert.ok(fs.existsSync(path.join(root, 'progress.json')), 'prune 时必须保留 progress.json');
+    assert.ok(!fs.existsSync(staleDay), 'prune 必须清掉窗口外的日期文件');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 function memoryStorage() {

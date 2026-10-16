@@ -25,13 +25,16 @@
  *   node scripts/cloud-scan.js --cookie "$NETEASE_MUSIC_U"
  *   node scripts/cloud-scan.js --no-compilations                   # 只扫新作，跳过合辑
  *   node scripts/cloud-scan.js --compilation-shards 8              # 合辑分 8 片轮转
+ *   node scripts/cloud-scan.js --push-every 180                    # 扫描中每 3 分钟增量推一次
  */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 const { NcmReadClient } = require('./lib/ncm-read-client');
 const {
   createCollector,
   writeSnapshot,
+  writeProgress,
   readArtistIds,
   loadExistingInto,
   readAlbumDates,
@@ -72,9 +75,68 @@ const MERGE = PARTIAL || args.includes('--merge');
 const PRUNE = !PARTIAL && !args.includes('--keep-old');
 const ENRICH = !args.includes('--no-enrich');
 const ARTISTS_FILE_PATH = path.resolve(pickArg('--artists', path.join(DST_MOBILE_DIR, ARTISTS_FILE)));
+// 扫描过程中的增量发布间隔（秒）。0 = 关闭（本地跑不需要，只有 Actions 要边扫边让页面看到结果）。
+// 整轮只保留一个提交（后续用 --amend 覆盖），所以不会把仓库历史刷爆。
+const PUSH_EVERY_MS = Math.max(0, Math.round((parseFloat(pickArg('--push-every', '0')) || 0) * 1000));
+// 增量落盘（写快照 + progress.json）的最小间隔，避免每 200 位艺人就把 8 个日期文件重写一遍
+const FLUSH_EVERY_MS = 30000;
+const SCAN_STARTED_AT = new Date().toISOString();
 
 function readPrevIndex() {
   try { return JSON.parse(fs.readFileSync(path.join(DST_MOBILE_DIR, 'index.json'), 'utf8')); } catch { return null; }
+}
+
+// ===== 扫描过程中的增量发布 =====
+// 只读页面看不到 Actions 的日志，只能在扫描过程中把 data/mobile 增量推到远端，
+// 页面才能「进度条往前走 + 当天卡片逐个出现」。本地跑时 --push-every 默认为 0，不做任何 git 操作。
+// 为了让仓库历史只多出一个提交，第 2 次起改用 git commit --amend 覆盖同一个提交，
+// 并用 --force-with-lease 推送：万一期间有人（本机）也推过，租约失效会安全地拒绝推送，
+// 不会覆盖别人；此时交给 workflow 末尾的正常 pull --rebase + push 兜底。
+let pushInFlight = false;
+let pushCommitReady = false;
+let lastPushAt = 0;
+
+function publishProgress(message, force) {
+  if (!PUSH_EVERY_MS || pushInFlight) return;
+  if (!force && lastPushAt && Date.now() - lastPushAt < PUSH_EVERY_MS) return;
+  pushInFlight = true;
+  lastPushAt = Date.now();
+  const git = (...a) => execFileSync('git', ['-C', DST_DIR, ...a], { stdio: 'pipe', encoding: 'utf8' });
+  try {
+    let branch = 'gh-pages';
+    try { branch = (git('rev-parse', '--abbrev-ref', 'HEAD') || '').trim() || branch; } catch {}
+    git('add', '--', 'data/mobile');
+    let staged = true;
+    try { git('diff', '--cached', '--quiet'); staged = false; } catch { staged = true; }
+    if (staged) {
+      if (pushCommitReady) git('commit', '--amend', '--no-verify', '-m', message);
+      else git('commit', '--no-verify', '-m', message);
+      pushCommitReady = true;
+    }
+    if (!staged && !pushCommitReady) return;
+    try {
+      git('push', '--force-with-lease', 'origin', 'HEAD:' + branch);
+    } catch {
+      // 租约失效（远端被别人推过）：同步远端后把自己的提交 rebase 上去，再普通推送一次
+      git('fetch', 'origin', branch);
+      git('rebase', 'origin/' + branch);
+      git('push', 'origin', 'HEAD:' + branch);
+    }
+    console.log('  [增量发布] ' + message);
+  } catch (e) {
+    console.warn('[WARN] 增量发布失败（不影响扫描）：' + String(e.message || e).split('\n')[0]);
+  } finally {
+    pushInFlight = false;
+  }
+}
+
+// 进度条总进度：阶段一（逐艺人新作）0~70%、阶段二（合辑）70~95%、补厂牌 95~100%
+function phasePercent(phase, doneCount, totalCount) {
+  const ratio = totalCount > 0 ? Math.max(0, Math.min(1, doneCount / totalCount)) : 0;
+  if (phase === 'new') return Math.round(ratio * 70);
+  if (phase === 'compilation') return 70 + Math.round(ratio * 25);
+  if (phase === 'enrich') return 95;
+  return 100;
 }
 
 async function fetchArtistAlbums(artistId) {
@@ -194,6 +256,47 @@ async function enrichCompanies(collector) {
   // 记录每位艺人本轮 /artist/album 拿到的专辑 id，供合辑阶段判断「是否本人名下」
   const albumIdsByArtist = new Map();
 
+  // 增量落盘 + 增量发布：页面靠它实现「进度条前进」与「当天卡片逐个出现」。
+  // prune 必须为 false —— 只有最后那次 writeSnapshot 才允许清理过期日期文件，
+  // 否则扫描中途会反复删除还没来得及重写的旧日期快照。
+  let lastFlushAt = 0;
+  function flushProgress(phase, doneCount, totalCount, message, force) {
+    const now = Date.now();
+    if (!force && now - lastFlushAt < FLUSH_EVERY_MS) return;
+    lastFlushAt = now;
+    const artistCount = Math.max(targets.length, Number(prevIndex?.artist_count) || 0);
+    const albumCount = Math.max(albumSeen, Number(prevIndex?.album_count) || 0);
+    try {
+      writeSnapshot({
+        dstMobileDir: DST_MOBILE_DIR,
+        collector,
+        days: DAYS,
+        artistCount,
+        albumCount,
+        prune: false,
+        extra: COMPILATIONS ? {
+          compilation_shard: compilationShard,
+          compilation_shards: COMPILATION_SHARDS
+        } : {}
+      });
+      writeProgress(DST_MOBILE_DIR, {
+        scanning: phase !== 'done',
+        phase,
+        done: doneCount,
+        total: totalCount,
+        percent: phasePercent(phase, doneCount, totalCount),
+        hits: collector.hitCount,
+        ok: okCount,
+        fail: failCount,
+        started_at: SCAN_STARTED_AT
+      });
+    } catch (e) {
+      console.warn('[WARN] 增量落盘失败（不影响扫描）：' + String(e.message || e).split('\n')[0]);
+      return;
+    }
+    publishProgress(message, force);
+  }
+
   let cursor = 0;
   async function worker() {
     for (;;) {
@@ -219,6 +322,8 @@ async function enrichCompanies(collector) {
         console.log('  进度 ' + done + '/' + targets.length
           + '（成功 ' + okCount + '，失败 ' + failCount + '，命中 ' + collector.hitCount + '）'
           + ' 用时 ' + secs.toFixed(0) + 's，预计剩余 ' + eta + 's');
+        flushProgress('new', done, targets.length,
+          'chore(snapshot): 云端扫描中 ' + done + '/' + targets.length);
       }
     }
   }
@@ -228,6 +333,9 @@ async function enrichCompanies(collector) {
   const elapsedScan = ((Date.now() - t0) / 1000).toFixed(1);
   console.log('\n逐艺人扫描完成，用时 ' + elapsedScan + 's'
     + '（成功 ' + okCount + ' / 失败 ' + failCount + '，抓取专辑 ' + albumSeen + ' 张）');
+  // 阶段一结束立刻把进度推到 70%，避免合辑阶段开始前进度条长时间停在原地
+  flushProgress('new', targets.length, targets.length,
+    'chore(snapshot): 云端扫描中 阶段一完成', true);
 
   /**
    * 扫描单个艺人的「合辑参与」，复刻本地 start-static.js 的 scanArtistCompilationBackend：
@@ -320,6 +428,8 @@ async function enrichCompanies(collector) {
           const secs = ((Date.now() - compStartedAt) / 1000).toFixed(0);
           console.log('  合辑进度 ' + compDone + '/' + shardTargets.length
             + '（新增合辑 ' + compilationHits + ' 条）用时 ' + secs + 's');
+          flushProgress('compilation', compDone, shardTargets.length,
+            'chore(snapshot): 云端扫描中 合辑 ' + compDone + '/' + shardTargets.length);
         }
       }
     }
@@ -337,6 +447,7 @@ async function enrichCompanies(collector) {
   if (ENRICH && collector.hitCount > 0) {
     const pending = Array.from(collector.byDay.values()).reduce((n, b) => n + b.size, 0);
     console.log('\n  补齐厂牌信息（共 ' + pending + ' 张专辑，其中已有厂牌的会跳过）…');
+    flushProgress('enrich', 0, 0, 'chore(snapshot): 云端扫描中 补齐厂牌', true);
     const enrichResult = await enrichCompanies(collector);
     companyFilled = enrichResult.filled;
     companyTotal = enrichResult.total;
@@ -360,6 +471,20 @@ async function enrichCompanies(collector) {
   if (albumDateCache.size) {
     writeAlbumDates(DST_MOBILE_DIR, albumDateCache);
   }
+  // 收尾：把进度标记为已结束（前端据此收起进度条），并把最终结果增量发布出去
+  writeProgress(DST_MOBILE_DIR, {
+    scanning: false,
+    phase: 'done',
+    done: targets.length,
+    total: targets.length,
+    percent: 100,
+    hits: collector.hitCount,
+    ok: okCount,
+    fail: failCount,
+    started_at: SCAN_STARTED_AT
+  });
+  publishProgress('chore(snapshot): 云端扫描 ' + new Date(Date.now() + 8 * 3600 * 1000)
+    .toISOString().slice(0, 16).replace('T', ' '), true);
 
   const compilationCount = Array.from(collector.byDay.values())
     .reduce((n, b) => n + Array.from(b.values()).filter(i => i.resultTab === 'compilation').length, 0);

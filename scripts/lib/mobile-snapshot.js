@@ -27,8 +27,10 @@ const ARTISTS_FILE = 'artists.json';
 const INDEX_FILE = 'index.json';
 // 专辑发行日期缓存（albumId -> publishTime）：用于跳过「合辑参与」里大量早已发行的候选专辑
 const ALBUM_DATES_FILE = 'album-dates.json';
+// 云端扫描进度：让只读页面也能显示进度条、并在扫描过程中逐条看到新卡片
+const PROGRESS_FILE = 'progress.json';
 // 清理过期快照时需要保留下来的非日期文件
-const KEEP_FILES = new Set([INDEX_FILE, ARTISTS_FILE, ALBUM_DATES_FILE]);
+const KEEP_FILES = new Set([INDEX_FILE, ARTISTS_FILE, ALBUM_DATES_FILE, PROGRESS_FILE]);
 
 function beijingDayKey(ts) {
   return new Date(Number(ts) + BJ_OFFSET_MS).toISOString().slice(0, 10);
@@ -265,6 +267,35 @@ function writeSnapshot(opts) {
   return { indexDates, indexPayload, pruned };
 }
 
+/**
+ * 写出云端扫描进度。
+ *
+ * 只读页面无法看到 Actions 的 stdout，只能靠这个文件显示进度条；
+ * 同时用来判断「是否正在扫描中」，扫描结束（scanning=false）后进度条收尾。
+ * percent 由产出端统一算好（阶段一 0~70%、合辑 70~95%、补厂牌 95~100%），
+ * 避免前端为了拼一个总进度而理解扫描阶段。
+ */
+function writeProgress(dstMobileDir, payload) {
+  const nowIso = new Date().toISOString();
+  const out = {
+    schema_version: 1,
+    timezone: 'Asia/Shanghai',
+    scanning: !!(payload && payload.scanning),
+    phase: String((payload && payload.phase) || ''),
+    done: Number(payload && payload.done) || 0,
+    total: Number(payload && payload.total) || 0,
+    percent: Math.max(0, Math.min(100, Math.round(Number(payload && payload.percent) || 0))),
+    hits: Number(payload && payload.hits) || 0,
+    ok: Number(payload && payload.ok) || 0,
+    fail: Number(payload && payload.fail) || 0,
+    started_at: String((payload && payload.started_at) || nowIso),
+    updated_at: nowIso
+  };
+  fs.mkdirSync(dstMobileDir, { recursive: true });
+  fs.writeFileSync(path.join(dstMobileDir, PROGRESS_FILE), JSON.stringify(out, null, 0), 'utf8');
+  return out;
+}
+
 /** 写出云端扫描用的艺人清单 */
 function writeArtistIds(dstMobileDir, ids) {
   fs.mkdirSync(dstMobileDir, { recursive: true });
@@ -348,10 +379,12 @@ module.exports = {
   ARTISTS_FILE,
   INDEX_FILE,
   ALBUM_DATES_FILE,
+  PROGRESS_FILE,
   beijingDayKey,
   recentDayList,
   createCollector,
   writeSnapshot,
+  writeProgress,
   writeArtistIds,
   readArtistIds,
   loadExistingInto,

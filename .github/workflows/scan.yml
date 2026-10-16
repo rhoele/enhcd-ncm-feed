@@ -88,6 +88,11 @@ jobs:
           tail -n 40 /tmp/ncm-api.log
           exit 1
 
+      - name: 配置 Git 身份（扫描过程中的增量发布要用）
+        run: |
+          git config user.name  "naf-scan-bot"
+          git config user.email "naf-scan-bot@users.noreply.github.com"
+
       - name: 逐艺人扫描并生成快照
         env:
           # 可选：在仓库 Settings → Secrets 里配置 NETEASE_MUSIC_U 可提升稳定性；
@@ -101,18 +106,17 @@ jobs:
             --concurrency "${{ github.event.inputs.concurrency || 16 }}" \
             --compilation-shards "${{ github.event.inputs.compilation_shards || 8 }}" \
             --compilation-budget-sec 1500 \
+            --push-every 180 \
             --max-artists "${{ github.event.inputs.max_artists || 0 }}"
 
       - name: 提交快照
         run: |
-          git config user.name  "naf-scan-bot"
-          git config user.email "naf-scan-bot@users.noreply.github.com"
           git add data/mobile
           if git diff --cached --quiet; then
             echo "快照无变化，跳过提交"
-            exit 0
+          else
+            git commit -m "chore(snapshot): 云端扫描 $(TZ=Asia/Shanghai date +'%Y-%m-%d %H:%M')"
           fi
-          git commit -m "chore(snapshot): 云端扫描 $(TZ=Asia/Shanghai date +'%Y-%m-%d %H:%M')"
-          # 本机可能同时推送过，先 rebase 再推，避免 non-fast-forward
+          # 扫描过程中已用 --push-every 增量推送（同一个提交反复 amend），这里兜底同步一次远端
           git pull --rebase --autostash origin gh-pages || true
           git push origin gh-pages

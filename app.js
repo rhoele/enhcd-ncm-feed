@@ -93,6 +93,65 @@
   let __staticSnapshotDates = [];   // [{date, count}]，由新到旧
   let __staticManualDay = '';       // 用户手动选中的日期；空 = 跟随最新一天
   let __staticIndexStamp = '';      // 上次渲染时的 index.json updated_at，用于轮询判断是否需要刷新
+  let __staticScanProgress = null;  // data/mobile/progress.json：云端扫描进度（进度条 + 是否扫描中）
+  let __staticStatusText = '';      // 最近一次渲染出的快照摘要（未扫描时显示它）
+  // 云端快照按北京日期分天，跨零点判断必须用同一时区，
+  // 否则浏览器时区与 Asia/Shanghai 不一致时会比云端早/晚一天跳到当天
+  function __beijingDayKey(ts){
+    return new Date(Number(ts) + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  }
+  function __todayKey(){
+    return __isStaticMode() ? __beijingDayKey(Date.now()) : formatDate(Date.now());
+  }
+  // 扫描中断（job 被杀 / 超时）时 progress.json 会停在 scanning:true，
+  // 超过 20 分钟没更新就当成已结束，避免进度条永远转下去
+  function __normalizeScanProgress(raw){
+    if(!raw || typeof raw !== 'object') return null;
+    const updated = Date.parse(String(raw.updated_at || ''));
+    const stale = !Number.isFinite(updated) || (Date.now() - updated) > 20 * 60 * 1000;
+    return {
+      scanning: raw.scanning === true && !stale,
+      phase: String(raw.phase || ''),
+      done: Number(raw.done || 0),
+      total: Number(raw.total || 0),
+      percent: Number(raw.percent || 0),
+      hits: Number(raw.hits || 0),
+      started_at: String(raw.started_at || '')
+    };
+  }
+  function __formatScanProgress(p){
+    const label = p.phase === 'compilation' ? '合辑扫描'
+      : p.phase === 'enrich' ? '补齐厂牌'
+      : '逐艺人扫描';
+    const pct = Math.max(0, Math.min(100, Number(p.percent || 0)));
+    let text = `云端扫描中 · ${label} ${p.done}/${p.total}（${pct}%）· 命中 ${p.hits} 张`;
+    const started = Date.parse(p.started_at);
+    if(Number.isFinite(started)){
+      const mins = Math.max(0, Math.round((Date.now() - started) / 60000));
+      if(mins > 0) text += ` · 已运行 ${mins} 分钟`;
+    }
+    return text;
+  }
+  // 静态模式下进度条/状态文本只有一个写入点：
+  // 扫描中显示扫描进度，扫描结束显示快照摘要，避免两者互相覆盖
+  function __paintStaticStatus(){
+    if(!__isStaticMode()) return;
+    const p = __staticScanProgress;
+    const scanning = !!(p && p.scanning);
+    const fill = document.getElementById('progressFill');
+    if(fill) fill.style.width = (scanning ? Math.max(1, Math.min(100, Number(p.percent || 0))) : 100) + '%';
+    const el = document.getElementById('progressText') || document.getElementById('loadingText');
+    if(!el) return;
+    el.textContent = scanning ? __formatScanProgress(p) : (__staticStatusText || '');
+  }
+  // 读云端扫描进度；文件不存在（尚未跑过带 --push-every 的扫描）时静默忽略
+  async function __loadStaticProgress(){
+    try{
+      const res = await fetch(__getStaticSnapshotBase() + '/progress.json', { cache: 'no-store' });
+      if(!res.ok) return;
+      __staticScanProgress = __normalizeScanProgress(await res.json());
+    }catch{}
+  }
   function getScanBackendBase() {
     try {
       const s = loadSettings();
@@ -2453,10 +2512,11 @@
   }
 
   // 启动午夜自动刷新检查 (每10秒检查一次日期变更)
+  // 静态模式用北京日期（与快照的 Asia/Shanghai 口径一致），本机实时扫描仍用浏览器本地日期
   function startMidnightChecker(){
-    let lastDate = formatDate(Date.now());
+    let lastDate = __todayKey();
     setInterval(() => {
-      const nowStr = formatDate(Date.now());
+      const nowStr = __todayKey();
       if(nowStr !== lastDate){
         console.log(`[AutoRefresh] Date changed: ${lastDate} -> ${nowStr}, triggering refresh...`);
         lastDate = nowStr;
@@ -2509,11 +2569,11 @@
     if(els.snapshotNext) els.snapshotNext.disabled = !(i > 0);
   }
 
-  async function __renderStaticSnapshot(preferredDay){
-    const statusEl = document.getElementById('progressText') || document.getElementById('loadingText');
+  async function __renderStaticSnapshot(preferredDay, quiet){
     const base = __getStaticSnapshotBase();
     try{
-      if(statusEl) statusEl.textContent = '正在读取云端快照…';
+      __staticStatusText = '正在读取云端快照…';
+      __paintStaticStatus();
       const idxRes = await fetch(base + '/index.json', { cache: 'no-store' });
       if(!idxRes.ok) throw new Error('index.json HTTP ' + idxRes.status);
       const idx = await idxRes.json();
@@ -2524,6 +2584,11 @@
       if(!dates.length && idx?.latest_date) dates = [{ date: String(idx.latest_date), count: 0 }];
       if(!dates.length) throw new Error('快照索引为空');
       dates.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      // 北京时间已经进入新的一天、但云端首轮扫描还没落盘（00:05 那次约 00:50 才有结果）时，
+      // 先补一个「当天」占位：页面像本地一样立刻跳到当天，卡片随扫描进度逐条补上，
+      // 而不是零点后还停留在昨天的日期上。
+      const todayKey = __beijingDayKey(Date.now());
+      if(todayKey > dates[0].date) dates.unshift({ date: todayKey, count: 0 });
       __staticSnapshotDates = dates;
 
       const available = new Set(dates.map(d => d.date));
@@ -2578,21 +2643,31 @@
 
       if(items.length){
         renderEnhancedPanelsFromState();
-        activateEnhancedTab(__enhancedUiState.activeTab, { preserveCurrentScroll: false, restoreScroll: false });
+        // 扫描进度触发的重渲染要保持用户当前滚动位置，否则每 30 秒被拉回顶部
+        activateEnhancedTab(__enhancedUiState.activeTab, { preserveCurrentScroll: !!quiet, restoreScroll: !!quiet });
         persistEnhancedUiState();
         try{ window.NAF_STORAGE.setItem(rangedKey, JSON.stringify(items)); }catch{}
-        if(statusEl) statusEl.textContent = `云端快照 ${scopeText} · ${items.length} 张（只读模式）`
+        __staticStatusText = `云端快照 ${scopeText} · ${items.length} 张（只读模式）`
           + (updatedText ? ` · 更新于 ${updatedText}` : '');
       } else {
-        const tip = `${scopeText} 快照中未发现新作。`
-          + (updatedText ? `快照更新于 ${updatedText}，` : '')
-          + (__staticSnapshotDates.length > 1 ? '可切换到前一天查看。' : '');
+        const scanning = !!(__staticScanProgress && __staticScanProgress.scanning);
+        const tip = (scanning && day === todayKey)
+          ? `${day} 云端扫描进行中，当天新作卡片会陆续出现…`
+          : (day === todayKey
+            ? `${day} 的云端快照尚未产出，扫描开始后卡片会陆续出现。`
+            : `${scopeText} 快照中未发现新作。`
+              + (updatedText ? `快照更新于 ${updatedText}，` : '')
+              + (__staticSnapshotDates.length > 1 ? '可切换到前一天查看。' : ''));
         renderFeedSection(ENHANCED_TAB_NEW, [], tip);
         renderFeedSection(ENHANCED_TAB_COMPILATION, [], getEnhancedEmptyMessage(ENHANCED_TAB_COMPILATION, 'empty'));
-        if(statusEl) statusEl.textContent = `云端快照 ${scopeText} · 暂无新作（只读模式）`;
+        __staticStatusText = scanning
+          ? ''
+          : `云端快照 ${scopeText} · 暂无新作（只读模式）`;
       }
+      __paintStaticStatus();
     }catch(err){
-      if(statusEl) statusEl.textContent = '快照读取失败：' + (err?.message || err);
+      __staticStatusText = '快照读取失败：' + (err?.message || err);
+      __paintStaticStatus();
       console.warn('[StaticSnapshot] 读取失败', err);
     }
   }
@@ -2620,27 +2695,45 @@
     });
   })();
 
-  // 云端快照由 Actions 定时产出（北京时间 00:05 那次约 00:50 出结果）。
-  // 页面长时间开着时定期重读 index.json，发现新快照自动刷新；
-  // 用户手动选过日期则不打扰（继续锁定在所选日期）。
+  // 云端快照由 Actions 定时产出，并在扫描过程中用 --push-every 增量推送。
+  // 页面长时间开着时轮询 progress.json + index.json：
+  //   - progress.json → 进度条/状态文案（扫描中 30 秒一次，空闲 5 分钟一次）
+  //   - index.json 的 updated_at 变化 → 重渲染，当天卡片随扫描逐条出现
+  // 用户手动选过日期时不打断其浏览（只更新进度条，不重渲染列表）。
   function startStaticSnapshotPoller(){
     if(!__isStaticMode()) return;
-    setInterval(async () => {
-      if(document.hidden || __staticManualDay) return;
+    const base = __getStaticSnapshotBase();
+    const IDLE_MS = 5 * 60 * 1000;
+    const SCANNING_MS = 30 * 1000;
+    let timer = null;
+    const schedule = (ms) => { try{ clearTimeout(timer); }catch{} timer = setTimeout(tick, ms); };
+    async function tick(){
+      let next = IDLE_MS;
       try{
-        const res = await fetch(__getStaticSnapshotBase() + '/index.json', { cache: 'no-store' });
-        if(!res.ok) return;
-        const idx = await res.json();
-        const stamp = String(idx?.updated_at || '');
-        if(!stamp || stamp === __staticIndexStamp) return;
-        await __renderStaticSnapshot();
+        if(!document.hidden){
+          await __loadStaticProgress();
+          if(__staticScanProgress && __staticScanProgress.scanning) next = SCANNING_MS;
+          __paintStaticStatus();
+
+          const idxRes = await fetch(base + '/index.json', { cache: 'no-store' }).catch(() => null);
+          if(idxRes && idxRes.ok){
+            const idx = await idxRes.json().catch(() => null);
+            const stamp = String(idx?.updated_at || '');
+            if(stamp && stamp !== __staticIndexStamp && !__staticManualDay){
+              await __renderStaticSnapshot(undefined, true);
+            }
+          }
+        }
       }catch{}
-    }, 5 * 60 * 1000);
+      schedule(next);
+    }
+    schedule(SCANNING_MS);
   }
 
   async function runDailyCheck(){
     // GitHub Pages 等无后端环境：改用静态快照，不再发起任何后端请求
     if(__isStaticMode()){
+      await __loadStaticProgress();
       await __renderStaticSnapshot();
       return;
     }
