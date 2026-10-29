@@ -1,48 +1,48 @@
 {
   "schema_version": 1,
   "timezone": "Asia/Shanghai",
-  "updated_at": "2026-10-29T08:35:44.756Z",
-  "latest_date": "2026-10-29",
+  "updated_at": "2026-10-29T16:27:46.039Z",
+  "latest_date": "2026-10-30",
   "days": 7,
   "artist_count": 9608,
-  "album_count": 358724,
+  "album_count": 358904,
   "dates": [
     {
+      "date": "2026-10-30",
+      "count": 524,
+      "generated_at": "2026-10-29T16:27:46.039Z"
+    },
+    {
       "date": "2026-10-29",
-      "count": 174,
-      "generated_at": "2026-10-29T08:35:44.756Z"
+      "count": 83,
+      "generated_at": "2026-10-29T16:27:46.039Z"
     },
     {
       "date": "2026-10-28",
-      "count": 96,
-      "generated_at": "2026-10-29T08:35:44.756Z"
+      "count": 94,
+      "generated_at": "2026-10-29T16:27:46.039Z"
     },
     {
       "date": "2026-10-27",
-      "count": 72,
-      "generated_at": "2026-10-29T08:35:44.756Z"
+      "count": 70,
+      "generated_at": "2026-10-29T16:27:46.039Z"
     },
     {
       "date": "2026-10-26",
       "count": 92,
-      "generated_at": "2026-10-29T08:35:44.756Z"
+      "generated_at": "2026-10-29T16:27:46.039Z"
     },
     {
       "date": "2026-10-25",
       "count": 91,
-      "generated_at": "2026-10-29T08:35:44.756Z"
+      "generated_at": "2026-10-29T16:27:46.039Z"
     },
     {
       "date": "2026-10-24",
       "count": 103,
-      "generated_at": "2026-10-29T08:35:44.756Z"
-    },
-    {
-      "date": "2026-10-23",
-      "count": 551,
-      "generated_at": "2026-10-29T08:35:44.756Z"
+      "generated_at": "2026-10-29T16:27:46.039Z"
     }
   ],
-  "compilation_shard": 0,
+  "compilation_shard": 1,
   "compilation_shards": 8
 }
