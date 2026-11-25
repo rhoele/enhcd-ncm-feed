@@ -6,8 +6,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>网易云关注艺人新作速递 · 增强版</title>
-  <link rel="stylesheet" href="styles.css?v=20260619-enhanced-ui-phase2-2" />
-  <link rel="stylesheet" href="mobile-ui.css?v=2">
+  <!-- 界面字体 Allo（SIL OFL 1.1，可商用）。它没有中文字形，中文会自动回退到系统字体。 -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/allo-font@1.1.0/allo.css" />
+  <link rel="stylesheet" href="styles.css?v=20261017-uirefresh" />
+  <link rel="stylesheet" href="mobile-ui.css?v=20261017-uirefresh">
 </head>
 <body>
   <header class="topbar">
@@ -47,12 +50,12 @@
         <div id="headerStatElapsed" class="header-stat-value">00:00</div>
       </section>
     </div>
-    <div id="progressBar" class="header-progress"><div id="progressFill" class="fill"></div></div>
+    <div id="progressBar" class="header-progress" data-state="idle" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progressFill" class="fill"></div></div>
   </header>
 
   <main>
     <section class="notice">
-      <p>增强版：启用更强的订阅列表分页扫描，尝试突破 4900 上限；并提供图形化进度条显示。</p>
+      <p>每天 <strong>00:00 自动扫描</strong>你关注的艺人：本人新作、参与的合辑，以及按厂牌汇总的当日新碟。数据来自云端快照，打开即可直接查看。</p>
     </section>
 
     <!-- Diagnostics moved here, hidden by default -->
@@ -363,7 +366,7 @@
 
   <script>window.__ENHANCED_MODE__ = true;</script>
   <script src="seed-settings.js"></script>
-  <script src="app.js?v=20261016-private2"></script>
+  <script src="app.js?v=20261017-uirefresh"></script>
   <script>
   (function(){
     try {

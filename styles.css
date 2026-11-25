@@ -1,38 +1,52 @@
+/*
+ * 设计基调（对齐《Refactoring UI》）
+ *   1. 层级不应靠「装饰」堆出来：全页只保留一个主色，其余用明度与留白区分。
+ *   2. 不要满屏渐变 / 发光：那会让所有元素看起来同等重要，反而没有重点。
+ *   3. 圆角按层级递减，避免所有容器都是同一个超大圆角。
+ *   4. 字体只声明真正能加载的字体，避免回退到意料之外的衬线/默认字体。
+ */
 :root {
-  --bg-color: #09090b;
-  --bg-gradient: 
-    radial-gradient(circle at 0% 0%, rgba(79, 70, 229, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 100% 0%, rgba(14, 165, 233, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 100% 100%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
-  
-  --surface-1: rgba(255, 255, 255, 0.03);
-  --surface-2: rgba(255, 255, 255, 0.06);
-  --surface-hover: rgba(255, 255, 255, 0.08);
-  
-  --border-light: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.15);
-  
+  --bg-color: #08080b;
+  --bg-glow: radial-gradient(58% 46% at 50% 0%, rgba(129, 140, 248, 0.10) 0%, transparent 100%);
+
+  --surface-1: rgba(255, 255, 255, 0.025);
+  --surface-2: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.075);
+
+  --border-light: rgba(255, 255, 255, 0.07);
+  --border-hover: rgba(255, 255, 255, 0.16);
+
   --primary: #818cf8;
   --primary-hover: #a5b4fc;
+  --primary-soft: rgba(129, 140, 248, 0.12);
   --accent: #2dd4bf;
+  --accent-soft: rgba(45, 212, 191, 0.10);
   --danger: #fb7185;
-  
-  --text-main: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
-  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-spotify: 'Spotify Mix', var(--font-sans);
-  
-  --radius-lg: 24px;
-  --radius-md: 16px;
-  --radius-sm: 10px;
-  
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-glow: 0 0 20px rgba(129, 140, 248, 0.15);
-  
-  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --text-main: #f5f5f7;
+  --text-secondary: #b0b0b8;
+  --text-muted: #85858f;
+
+  /*
+   * 界面字体：Allo（SIL OFL 1.1，自带等宽数字与光学字号），由 CDN 加载。
+   * 它没有中文字形，所以中文会沿栈继续回退到系统 UI 字体；这属于预期行为。
+   * 'Spotify Mix' 只对本机已安装该字体的用户生效，作为偏好保留但没有分发该字体。
+   */
+  --font-ui: "Allo", "Spotify Mix", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-sans: var(--font-ui);
+  --font-spotify: var(--font-ui);
+
+  --radius-xl: 20px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 0 1px rgba(129, 140, 248, 0.22);
+
+  --transition: 180ms cubic-bezier(0.2, 0, 0.2, 1);
 }
 
 * { box-sizing: border-box; }
@@ -41,40 +55,43 @@ body {
   margin: 0;
   padding: 0;
   background-color: var(--bg-color);
-  background-image: var(--bg-gradient);
+  background-image: var(--bg-glow);
+  background-repeat: no-repeat;
   background-attachment: fixed;
   color: var(--text-main);
   font-family: var(--font-sans);
+  font-size: 16px;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   min-height: 100vh;
-  line-height: 1.5;
+  line-height: 1.65;
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 99px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); background-clip: content-box; }
 
 /* Header */
 .topbar {
   position: sticky;
-  top: 20px;
+  top: 16px;
   z-index: 100;
   margin: 0 20px;
-  padding: 16px 24px;
-  background: rgba(9, 9, 11, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  padding: 16px 20px;
+  background: rgba(12, 12, 16, 0.8);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   overflow: hidden; /* For progress bar */
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 14px;
 }
 
 .header-main {
@@ -86,105 +103,174 @@ body {
 }
 
 .topbar h1 {
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 700;
   margin: 0;
-  background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: -0.01em;
+  color: var(--text-main);
+  letter-spacing: -0.015em;
+  line-height: 1.35;
 }
 
 .header-status {
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--text-secondary);
   font-weight: 500;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
 }
 
+/* 分段式 Tab：一个容器 + 一个填充块，比三个渐变胶囊更安静，也更像原生控件 */
 .header-tabs {
   display: inline-flex;
-  gap: 10px;
-  margin-top: 10px;
+  align-self: flex-start; /* 不跟随父级 flex 拉伸成整行空槽 */
+  gap: 2px;
+  margin-top: 12px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--border-light);
   flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .tab-btn {
-  border: 1px solid var(--border-light);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--text-secondary);
-  padding: 8px 14px;
+  padding: 8px 18px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.4;
   cursor: pointer;
-  transition: var(--transition);
+  transition: color var(--transition), background var(--transition);
+  white-space: nowrap;
 }
 
 .tab-btn:hover {
   color: var(--text-main);
-  border-color: var(--border-hover);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .tab-btn.is-active {
-  color: #0f172a;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #0b0b10;
+  background: var(--primary);
   border-color: transparent;
-  box-shadow: 0 8px 18px rgba(129, 140, 248, 0.22);
+  box-shadow: 0 2px 10px rgba(129, 140, 248, 0.3);
 }
 
+/*
+ * 顶部进度条：4px 贴底，按 #progressBar 的 data-state 切换外观
+ *   idle     没有进度数据，保持静默
+ *   scanning 斜纹流动，最容易被读成「正在跑」
+ *   paused   斜纹定格并压暗，避免误以为还在推进
+ *   done     实心渐变，收掉动画
+ *   error    告警色，同时把状态文字染红
+ */
 .header-progress {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
   height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 0 10px rgba(129, 140, 248, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
 }
 
 .header-progress .fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary), var(--accent));
   width: 0%;
-  transition: width 0.3s ease-out;
-  box-shadow: 0 0 10px var(--primary);
+  border-radius: 0 999px 999px 0;
+  background-color: var(--primary);
+  transition: width 420ms cubic-bezier(0.2, 0, 0.2, 1);
 }
+
+#progressBar[data-state="scanning"] .fill {
+  background-image: repeating-linear-gradient(115deg,
+    var(--primary) 0 8px,
+    #6c76f2 8px 16px);
+  background-size: 27px 100%;
+  animation: naf-stripes 900ms linear infinite;
+}
+
+#progressBar[data-state="paused"] .fill {
+  background-image: repeating-linear-gradient(115deg,
+    rgba(129, 140, 248, 0.7) 0 8px,
+    rgba(108, 118, 242, 0.55) 8px 16px);
+  background-size: 27px 100%;
+  animation: none;
+}
+
+#progressBar[data-state="done"] .fill {
+  background-image: linear-gradient(90deg, #6366f1, var(--primary), var(--accent));
+  animation: none;
+}
+
+#progressBar[data-state="error"] .fill {
+  background-image: none;
+  background-color: var(--danger);
+  animation: none;
+}
+
+#progressBar[data-state="idle"] .fill {
+  background-image: none;
+  background-color: transparent;
+  animation: none;
+}
+
+@keyframes naf-stripes {
+  from { background-position: 0 0; }
+  to { background-position: 27px 0; }
+}
+
+/* 状态文字跟随进度条状态，让「出错」在文字上也能被看见 */
+.topbar[data-state="error"] .header-status { color: #fda4af; }
+.topbar[data-state="paused"] .header-status { color: var(--text-muted); }
 
 .actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex: 0 0 auto;
   align-self: flex-start;
 }
 
+/* 统计条：几个数字直接铺开，用一条细线跟标题分开，不再各自套一个渐变卡片抢视线。
+   列数交给 auto-fit，避免「5 个项目塞进 3 列」时最后一行只剩孤零零一个。 */
 .header-stats {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-  padding-top: 4px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 16px;
+  padding-top: 12px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border-light);
 }
 
 .header-stat-card {
   min-width: 0;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
 }
 
 .header-stat-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   margin-bottom: 8px;
+  letter-spacing: 0.015em;
+  line-height: 1.45;
 }
 
 .header-stat-value {
-  font-size: 18px;
-  line-height: 1;
-  font-weight: 800;
-  color: #fff;
+  font-size: 26px;
+  line-height: 1.05;
+  font-weight: 600;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  font-feature-settings: "tnum" 1;
 }
 
 /* Buttons */
@@ -192,52 +278,52 @@ body {
   background: var(--surface-2);
   border: 1px solid var(--border-light);
   color: var(--text-main);
-  padding: 8px 20px;
-  border-radius: 99px;
+  padding: 9px 18px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
-  transition: var(--transition);
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .btn:hover {
   background: var(--surface-hover);
   border-color: var(--border-hover);
-  transform: translateY(-1px);
 }
 
-.btn:active { transform: translateY(0); }
+.btn:active { transform: translateY(1px); }
 
 .btn.primary {
   background: var(--primary);
-  color: #0f172a;
+  color: #0b0b10;
   border-color: transparent;
-  box-shadow: 0 4px 12px rgba(129, 140, 248, 0.3);
+  box-shadow: 0 2px 10px rgba(129, 140, 248, 0.28);
 }
 
 .btn.primary:hover {
   background: var(--primary-hover);
-  box-shadow: 0 6px 16px rgba(129, 140, 248, 0.4);
+  box-shadow: 0 4px 14px rgba(129, 140, 248, 0.36);
 }
 
 .btn.danger {
-  background: rgba(251, 113, 133, 0.14);
-  color: #fecdd3;
-  border-color: rgba(251, 113, 133, 0.28);
+  background: rgba(251, 113, 133, 0.10);
+  color: #fda4af;
+  border-color: rgba(251, 113, 133, 0.24);
 }
 
 .btn.danger:hover {
-  background: rgba(251, 113, 133, 0.2);
-  border-color: rgba(251, 113, 133, 0.38);
+  background: rgba(251, 113, 133, 0.16);
+  border-color: rgba(251, 113, 133, 0.34);
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -245,14 +331,14 @@ body {
 
 /* Layout */
 main {
-  max-width: 1600px;
-  margin: 40px auto;
-  padding: 0 32px;
+  max-width: 1480px;
+  margin: 28px auto 0;
+  padding: 0 24px;
 }
 
 .result-panel,
 .aux-panel {
-  margin-bottom: 36px;
+  margin-bottom: 32px;
 }
 
 .result-panel[hidden] {
@@ -260,11 +346,12 @@ main {
 }
 
 .section-subtitle {
-  margin: 0 0 16px;
-  padding: 0 8px;
+  margin: 0 0 14px;
+  padding: 0 2px;
   font-size: 14px;
-  font-weight: 700;
-  color: var(--text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
 }
 
 /* Section Headers */
@@ -272,65 +359,87 @@ main {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 32px;
-  padding: 0 8px;
+  margin-bottom: 24px;
+  padding: 0 2px;
 }
 
 .section-header h3 {
-  font-size: 28px;
+  font-size: 25px;
   margin: 0;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  background: linear-gradient(to right, #fff, #94a3b8);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  color: var(--text-main);
 }
 
 /* Notices & Progress */
 .notice {
-  background: linear-gradient(to right, rgba(129, 140, 248, 0.1), rgba(45, 212, 191, 0.05));
-  border: 1px solid rgba(129, 140, 248, 0.2);
-  border-radius: var(--radius-md);
-  padding: 24px;
-  color: #c7d2fe;
-  margin-bottom: 40px;
-  font-size: 15px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: linear-gradient(180deg, rgba(129, 140, 248, 0.08), rgba(129, 140, 248, 0.02));
+  border: 1px solid rgba(129, 140, 248, 0.18);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  color: var(--text-secondary);
+  margin-bottom: 26px;
+  font-size: 14.5px;
+  line-height: 1.75;
 }
+
+/* 用一枚 CSS 唱片当作提示图标，纯装饰但贴合主题，不额外增加请求 */
+.notice::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, var(--bg-color) 0 2.5px, var(--primary) 2.5px 100%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.28) 0 1px, transparent 1px 3px);
+  opacity: 0.85;
+}
+
+.notice p { margin: 0; }
+.notice strong { color: var(--text-main); font-weight: 600; }
 
 #progressBox {
   background: var(--surface-1);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: 32px;
-  margin-bottom: 48px;
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  margin-bottom: 40px;
   text-align: center;
 }
 
 .progress {
   height: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
   overflow: hidden;
-  margin: 16px auto;
-  max-width: 600px;
+  margin: 14px auto;
+  max-width: 560px;
 }
 
 .progress .fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 999px;
+  background: var(--primary);
   width: 0%;
-  transition: width 0.3s ease-out;
-  box-shadow: 0 0 12px var(--primary);
+  transition: width 300ms ease-out;
 }
 
 .hint {
   font-size: 13px;
   color: var(--text-muted);
+  line-height: 1.65;
 }
 
 .progress-text {
   margin: 6px 0 12px;
   color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .diagnostics {
@@ -357,21 +466,44 @@ main {
 /* Grid */
 .feed {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
-  margin-bottom: 80px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 64px;
   align-items: stretch; /* Cards same height */
 }
 
+/* 空状态：缓慢旋转的唱片，比一行灰字更能表达「还没转起来」 */
 .empty {
   grid-column: 1 / -1;
-  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px 24px;
   text-align: center;
   color: var(--text-muted);
   background: var(--surface-1);
-  border: 1px dashed var(--border-light);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  font-size: 14px;
+  font-size: 14.5px;
+  line-height: 1.8;
+}
+
+.empty::before {
+  content: "";
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.55) 0 3px, transparent 3px 100%),
+    repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,0.055) 0 1px, transparent 1px 4px),
+    #15151a;
+  border: 1px solid var(--border-light);
+  animation: naf-vinyl 10s linear infinite;
+}
+
+@keyframes naf-vinyl {
+  to { transform: rotate(360deg); }
 }
 
 /* Cards */
@@ -380,18 +512,23 @@ main {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: var(--transition);
+  transition: transform var(--transition), border-color var(--transition), background var(--transition), box-shadow var(--transition);
   display: flex;
   flex-direction: column;
   position: relative;
 }
 
+/* 悬停只做「轻微抬起 + 边框变亮」，不再整体发光放大 */
 .card:hover {
-  transform: translateY(-8px);
+  transform: translateY(-2px);
   border-color: var(--border-hover);
   background: var(--surface-2);
-  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  box-shadow: var(--shadow-lg);
   z-index: 1;
+}
+
+.card:focus-within {
+  border-color: rgba(129, 140, 248, 0.4);
 }
 
 .cover {
@@ -399,29 +536,25 @@ main {
   aspect-ratio: 1;
   overflow: hidden;
   position: relative;
-}
-
-.cover::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.6));
-  opacity: 0.6;
+  /* 封面加载完成前是一块静态底色占位，避免大片空白跳动 */
+  background: linear-gradient(110deg, #101014, #17171d 45%, #101014 100%);
 }
 
 .cover img {
+  position: relative;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: block;
+  transition: transform 600ms cubic-bezier(0.2, 0, 0.2, 1);
 }
 
 .card:hover .cover img {
-  transform: scale(1.08);
+  transform: scale(1.04);
 }
 
 .meta {
-  padding: 24px;
+  padding: 20px 20px 18px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -431,9 +564,9 @@ main {
 .title {
   font-family: var(--font-spotify);
   font-size: 18px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1.4;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.45;
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -446,96 +579,109 @@ main {
   font-size: 14px;
   color: var(--text-secondary);
   font-weight: 500;
+  line-height: 1.6;
 }
 
 .artist.secondary {
   color: var(--text-muted);
+  font-size: 13.5px;
 }
 
 .meta-line {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-secondary);
-  line-height: 1.5;
+  line-height: 1.65;
 }
 
 .meta-line strong {
-  color: #fff;
+  color: var(--text-main);
   font-weight: 600;
 }
 
+/* 厂牌从「整条发光横幅」降级成一枚小胶囊：它是次要元数据，不该和标题抢注意力 */
 .label-bar {
-  display: block;
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: linear-gradient(90deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.08));
-  border: 1px solid rgba(52, 211, 153, 0.28);
-  color: #86efac;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.45;
-  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.04);
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  color: #5eead4;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .tag, .source, .label {
-  font-size: 11px;
-  padding: 4px 10px;
-  border-radius: 99px;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  width: fit-content;
+  max-width: 100%;
+  line-height: 1.6;
 }
 
-.source { background: rgba(129, 140, 248, 0.15); color: var(--primary); }
-.label { background: rgba(45, 212, 191, 0.15); color: var(--accent); }
+.source { background: var(--primary-soft); color: var(--primary-hover); }
+.label { background: var(--accent-soft); color: #5eead4; }
 
 .date {
   margin-top: auto;
-  padding-top: 20px;
+  padding-top: 14px;
   border-top: 1px solid var(--border-light);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Interactive Elements in Card */
 .links {
   display: flex;
-  gap: 8px;
-  margin-top: 16px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
   align-items: stretch;
 }
 
+/* 四个操作在窄卡里会挤成一行小字，改成分两列换行，点击区域更实在 */
 .pill {
-  flex: 1;
+  flex: 1 1 calc(50% - 3px);
   text-align: center;
-  padding: 8px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid transparent;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 500;
   text-decoration: none;
-  transition: var(--transition);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
   white-space: nowrap;
-  line-height: 1.2;
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  cursor: pointer;
 }
 
 .pill:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--text-main);
   border-color: var(--border-light);
 }
 
@@ -732,9 +878,17 @@ main {
 }
 .label-list .by { font-family: var(--font-spotify); display: block; margin-top: 4px; font-size: 13px; color: var(--text-muted); }
 
+@media (max-width: 1024px) {
+  /* 平板 / 小笔记本：顶栏内容较多，改为不吸顶，避免它长期遮住正文 */
+  .topbar {
+    position: relative;
+    top: 0;
+  }
+}
+
 @media (max-width: 1240px) {
   .header-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
   }
 }
 
@@ -746,9 +900,6 @@ main {
   main {
     padding: 0 18px;
   }
-  .header-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 640px) {
@@ -758,9 +909,6 @@ main {
   }
   .actions .btn {
     flex: 1 1 calc(50% - 6px);
-  }
-  .header-stats {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1125,11 +1273,11 @@ main {
 /* Footer */
 .footer {
   text-align: center;
-  padding: 60px 0;
+  padding: 40px 0;
   color: var(--text-muted);
   font-size: 13px;
   border-top: 1px solid var(--border-light);
-  margin-top: 80px;
+  margin-top: 64px;
 }
 
 /* Responsive */

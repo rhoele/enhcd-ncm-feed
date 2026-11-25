@@ -165,9 +165,9 @@
       } catch (error) { el('personalError').textContent = error.message; }
     });
     const notice = document.querySelector('.notice p');
-    if (notice) notice.textContent = window.NAF_PERSONAL_MODE
-      ? '个人扫描模式：仅连接你自己的后端。配置保存在当前标签页会话中。'
-      : '公共快照 · 无需登录。新作与合辑由定时任务更新；个人扫描请在设置中接入自己的后端。';
+    if (notice) notice.innerHTML = window.NAF_PERSONAL_MODE
+      ? '<strong>个人扫描模式</strong>：只连接你自己的后端，配置仅保存在当前标签页会话中。'
+      : '<strong>公共快照</strong> · 无需登录。新作与合辑每天定时更新；想扫描自己的关注列表，可在设置里接入个人后端。';
     const pause = el('pauseBtn');
     if (pause && !window.NAF_PERSONAL_MODE) pause.hidden = true;
   });

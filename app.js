@@ -95,6 +95,7 @@
   let __staticIndexStamp = '';      // 上次渲染时的 index.json updated_at，用于轮询判断是否需要刷新
   let __staticScanProgress = null;  // data/mobile/progress.json：云端扫描进度（进度条 + 是否扫描中）
   let __staticStatusText = '';      // 最近一次渲染出的快照摘要（未扫描时显示它）
+  let __staticFailed = false;       // 最近一次快照读取是否失败，用于把进度条切成 error 状态
   // 云端快照按北京日期分天，跨零点判断必须用同一时区，
   // 否则浏览器时区与 Asia/Shanghai 不一致时会比云端早/晚一天跳到当天
   function __beijingDayKey(ts){
@@ -132,14 +133,33 @@
     }
     return text;
   }
+  // 进度条状态：CSS 通过 #progressBar[data-state] 切换外观
+  //   idle / scanning / paused / done / error
+  // 同时补齐 aria-*，让读屏软件也能拿到进度值
+  function __setProgressState(state, pct){
+    const bar = document.getElementById('progressBar');
+    const topbar = document.querySelector('.topbar');
+    const value = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+    if(bar){
+      bar.dataset.state = state;
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-valuemin', '0');
+      bar.setAttribute('aria-valuemax', '100');
+      bar.setAttribute('aria-valuenow', String(value));
+      bar.setAttribute('aria-busy', state === 'scanning' ? 'true' : 'false');
+    }
+    if(topbar) topbar.dataset.state = state;
+  }
   // 静态模式下进度条/状态文本只有一个写入点：
   // 扫描中显示扫描进度，扫描结束显示快照摘要，避免两者互相覆盖
   function __paintStaticStatus(){
     if(!__isStaticMode()) return;
     const p = __staticScanProgress;
     const scanning = !!(p && p.scanning);
+    const pct = scanning ? Math.max(1, Math.min(100, Number(p.percent || 0))) : 100;
     const fill = document.getElementById('progressFill');
-    if(fill) fill.style.width = (scanning ? Math.max(1, Math.min(100, Number(p.percent || 0))) : 100) + '%';
+    if(fill) fill.style.width = pct + '%';
+    __setProgressState(__staticFailed ? 'error' : (scanning ? 'scanning' : 'done'), pct);
     const el = document.getElementById('progressText') || document.getElementById('loadingText');
     if(!el) return;
     el.textContent = scanning ? __formatScanProgress(p) : (__staticStatusText || '');
@@ -2032,6 +2052,9 @@
     }
     const textEl = document.getElementById('progressText') || document.getElementById('loadingText');
     if(textEl) textEl.textContent = '已暂停当前扫描，可重新点击“立即刷新”继续。';
+    // 进度条停在当前位置并切成 paused（斜纹定格），避免看起来还在推进
+    const fillEl = document.getElementById('progressFill');
+    __setProgressState('paused', parseFloat(String(fillEl?.style.width || '0')) || 0);
     console.log(`[Enhanced] Scan paused at token ${activeToken}`);
   }
 
@@ -2572,6 +2595,7 @@
   async function __renderStaticSnapshot(preferredDay, quiet){
     const base = __getStaticSnapshotBase();
     try{
+      __staticFailed = false;
       __staticStatusText = '正在读取云端快照…';
       __paintStaticStatus();
       const idxRes = await fetch(base + '/index.json', { cache: 'no-store' });
@@ -2666,6 +2690,7 @@
       }
       __paintStaticStatus();
     }catch(err){
+      __staticFailed = true;
       __staticStatusText = '快照读取失败：' + (err?.message || err);
       __paintStaticStatus();
       console.warn('[StaticSnapshot] 读取失败', err);
@@ -4920,6 +4945,7 @@
     const d = Math.min(done, total);
     const pct = total>0 ? Math.round(100 * d / total) : 0;
     if(fill) fill.style.width = `${pct}%`;
+    __setProgressState(total>0 && pct>=100 ? 'done' : 'scanning', pct);
     if(text) text.textContent = `进度：艺人 ${d}/${total} · 卡片 ${__shownCount}（${pct}%）`;
   }
   function calcTimeoutByTotal(total){
